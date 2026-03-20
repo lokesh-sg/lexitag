@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+aiosqlite
+mutagen
+aiohttp
+cryptography
+python-dotenv
+PyYAML
