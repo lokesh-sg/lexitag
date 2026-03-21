@@ -49,8 +49,9 @@ async def lifespan(app: FastAPI):
 try:
     _version_path = Path(__file__).resolve().parent.parent.parent / "VERSION"
     VERSION = _version_path.read_text().strip()
-except Exception:
-    VERSION = "0.1.2.dev"
+except:
+    VERSION = "0.1.3"
+
 
 app = FastAPI(
     title="LexiTag API",
