@@ -29,6 +29,12 @@ Download the source files and prepare your environment:
 # Required for dashboard access
 LEXITAG_AUTH_TOKEN=your_secure_token_here
 
+# Required for dashboard access
+LEXITAG_AUTH_TOKEN=your_secure_token_here
+
+# A strong secret string of your chioce to encrypt your AI keys in the database
+LEXITAG_MASTER_KEY=your_secret_password_here
+
 # ── Environment ──
 ENV=production
 
@@ -50,7 +56,7 @@ Link your data and music library folders in `docker-compose.yml`:
 ```yaml
     volumes:
       - ./data:/app/data
-      - /your/host/music:/app/music:ro
+      - /path/to/your/music:/app/music # Mount your music library (Read/Write access required)
 ```
 
 ### 4. AI Provider Setup
