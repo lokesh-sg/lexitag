@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: 'DM Sans', 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #111113;
+    color: #f0ece4;
+    overflow-x: hidden;
+  }
+
+  /* ── Scrollbars ── */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3a3a42 #18181b;
+  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #18181b; }
+  ::-webkit-scrollbar-thumb { background: #3a3a42; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #514d47; }
+
+  /* ── Selection ── */
+  ::selection { background: rgba(233,158,26,.2); color: #f0ece4; }
+  ::-moz-selection { background: rgba(233,158,26,.2); color: #f0ece4; }
+}
+
+@layer components {
+  /* ── Card ── */
+  .studio-card {
+    @apply bg-surface-2 rounded-xl shadow-card;
+    border: 1px solid rgba(58,58,66,.5);
+  }
+
+  /* ── Primary button — warm amber ── */
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200
+           bg-amber-400 text-surface-0
+           hover:bg-amber-300 hover:shadow-md
+           active:scale-[0.97] active:bg-amber-500;
+  }
+  .btn-primary-sm {
+    @apply px-3 py-1.5 rounded-md font-medium text-xs transition-all duration-200
+           bg-amber-400 text-surface-0
+           hover:bg-amber-300
+           active:scale-[0.97];
+  }
+
+  /* ── Ghost button ── */
+  .btn-ghost {
+    @apply px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200
+           text-ink-normal
+           hover:text-ink-rich
+           active:scale-[0.97];
+    border: 1px solid rgba(58,58,66,.6);
+  }
+  .btn-ghost:hover {
+    border-color: rgba(123,74,12,.5);
+    background: rgba(39,39,44,.5);
+  }
+
+  /* ── Secondary button ── */
+  .btn-secondary {
+    @apply px-4 py-2 rounded-lg font-bold text-[11px] uppercase tracking-wider transition-all duration-200
+           bg-surface-3 text-ink-normal border border-surface-5/50
+           hover:bg-surface-4 hover:border-amber-500/30 hover:text-amber-500
+           active:scale-[0.97];
+  }
+
+  /* ── Danger button ── */
+  .btn-danger {
+    @apply px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200;
+    color: #c5524b;
+    border: 1px solid rgba(197,82,75,.25);
+  }
+  .btn-danger:hover {
+    background: rgba(197,82,75,.1);
+    border-color: rgba(197,82,75,.5);
+  }
+  .btn-danger:active { transform: scale(0.97); }
+
+  /* ── Badges ── */
+  .tag {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider;
+  }
+  .tag-danger {
+    @apply tag;
+    background: rgba(197,82,75,.12);
+    color: #c5524b;
+    border: 1px solid rgba(197,82,75,.2);
+  }
+  .tag-warn {
+    @apply tag;
+    background: rgba(201,148,62,.12);
+    color: #c9943e;
+    border: 1px solid rgba(201,148,62,.2);
+  }
+  .tag-success {
+    @apply tag;
+    background: rgba(90,154,107,.12);
+    color: #5a9a6b;
+    border: 1px solid rgba(90,154,107,.2);
+  }
+  .tag-info {
+    @apply tag;
+    background: rgba(107,143,173,.12);
+    color: #6b8fad;
+    border: 1px solid rgba(107,143,173,.2);
+  }
+
+  /* ── Input ── */
+  .input-field {
+    @apply w-full px-3 py-2 rounded-lg text-sm
+           bg-surface-0 text-ink-rich
+           placeholder-ink-faint
+           transition-all duration-200;
+    border: 1px solid rgba(58,58,66,.6);
+  }
+  .input-field:focus {
+    outline: none;
+    border-color: rgba(123,74,12,.6);
+    box-shadow: 0 0 0 1px rgba(123,74,12,.3);
+  }
+
+  /* ── Table row ── */
+  .row-hover {
+    @apply transition-colors duration-100;
+  }
+  .row-hover:hover {
+    background: rgba(39,39,44,.4);
+  }
+
+  /* ── Progress bar ── */
+  .progress-track {
+    @apply h-1 rounded-full overflow-hidden bg-surface-4;
+  }
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500 ease-out;
+    background: linear-gradient(to right, #a8640a, #e99e1a, #c08a55);
+  }
+}
+
+@layer utilities {
+  .text-warm-glow {
+    text-shadow: 0 0 20px rgba(233,158,26,.12);
+  }
+}

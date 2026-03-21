@@ -1,0 +1,15 @@
+services:
+  lexitag:
+    build: .
+    container_name: lexitag
+    network_mode: "host" # Required for UPnP SSDP multicast discovery
+    env_file: .env
+    environment:
+      - MUSIC_DIR=/app/music
+      - DATA_DIR=/app/data
+    volumes:
+      - ./music:/app/music # Mount local music library
+      - ./data:/app/data # Persist SQLite database
+    restart: unless-stopped
+    # Port 3030 is exposed directly via host networking
+    # Access the UI at http://localhost:3030
