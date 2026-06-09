@@ -296,6 +296,7 @@ The batch engine retries on API failures and soft-skips tracks the AI cannot ide
 - Hardened Docker image to run securely as a non-root user (`lexitag`).
 - Implemented cross-compilation fixes for reliable Apple Silicon (arm64) to Intel (amd64) server deployments.
 - Upgraded multiple vulnerable frontend dependencies.
+- Restructured the repository for standard Git branching, moving `frontend` and `backend` code directly to the root.
 
 ### v0.1.3 (2026-05-15)
 - Removed insecure `LEXITAG_MASTER_KEY` fallback authentication system to eliminate backdoor vulnerabilities.
