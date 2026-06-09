@@ -3,17 +3,17 @@
 from fastapi import APIRouter, Query, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pathlib import Path
-from ..database import get_db
-from ..models import TrackBase, TrackList, ScanResponse, TrackUpdateModel, RawTagsResponse, LocalFixRequest
-from ..services.scanner import scan_directory
-from ..config import settings
+from backend.app.database import get_db
+from backend.app.models import TrackBase, TrackList, ScanResponse, TrackUpdateModel, RawTagsResponse, LocalFixRequest
+from backend.app.services.scanner import scan_directory
+from backend.app.config import settings
 import json
 import time
 import os
 import uuid
 import asyncio
-from ..services.fast_refresh import start_fast_refresh
-from ..security import validate_path
+from backend.app.services.fast_refresh import start_fast_refresh
+from backend.app.security import validate_path
 
 router = APIRouter(prefix="/api/tracks", tags=["tracks"])
 
@@ -28,7 +28,7 @@ async def scan_library():
     """Start a background library scan and return a job_id."""
     import uuid
     import asyncio
-    from ..database import get_setting
+    from backend.app.database import get_setting
 
     job_id = str(uuid.uuid4())[:8]
     _scan_progress[job_id] = {"current": 0, "total": 0, "status": "initializing"}
@@ -80,7 +80,7 @@ async def scan_library():
                     await db.execute(
                         """UPDATE tracks SET
                             filename=?, title=?, artist=?, album=?, genre=?, year=?, composer=?, comment=?,
-                            duration=?, bitrate=?, has_lyrics=?, has_junk=?, format=?, lyrics=?, last_scanned=?
+                            duration=?, bitrate=?, has_lyrics=?, has_junk=?, format=?, lyrics=?, last_scanned=?, is_missing=0, raw_tags_json=?
                            WHERE path=?""",
                         (
                             track["filename"], track["title"], track["artist"],
@@ -88,23 +88,25 @@ async def scan_library():
                             track.get("comment", ""),
                             track["duration"], track.get("bitrate", 0), 1 if track["has_lyrics"] else 0,
                             1 if track["has_junk"] else 0, track["format"],
-                            "", track["last_scanned"], track["path"], # Stop saving lyrics to DB
+                            "", track["last_scanned"], track.get("raw_tags_json", "{}"), track["path"],
                         ),
                     )
                 else:
                     await db.execute(
                         """INSERT INTO tracks
                             (path, filename, title, artist, album, genre, year, composer, comment,
-                             duration, bitrate, has_lyrics, has_junk, format, lyrics, last_scanned)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                             duration, bitrate, has_lyrics, has_junk, format, lyrics, last_scanned, is_missing, raw_tags_json)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
                         (
                             track["path"], track["filename"], track["title"],
                             track["artist"], track["album"], track["genre"],
                             track["year"], track["composer"], track.get("comment", ""),
                             track["duration"], track.get("bitrate", 0), 1 if track["has_lyrics"] else 0,
-                            1 if track["has_junk"] else 0, track["format"], "", track["last_scanned"], # Stop saving lyrics to DB
+                            1 if track["has_junk"] else 0, track["format"], "", track["last_scanned"],
+                            track.get("raw_tags_json", "{}")
                         ),
                     )
+
                 
                 total_seen += 1
                 batch_count += 1
@@ -129,19 +131,36 @@ async def scan_library():
 
             # Flush any new junk suggestions discovered during this scan
             try:
-                from ..services.discovery_engine import discovery_engine
+                from backend.app.services.discovery_engine import discovery_engine
                 await discovery_engine.flush_suggestions()
             except Exception as e:
                 print(f"[tracks] Discovery flush failed: {e}")
 
-            # Cleanup
-            # Cleanup disabled to prevent data loss if volume is unmounted
+
+
+            # Safe Cleanup (Soft-Deleting / Pruning)
+            # Only prune if we actually saw files, which proves the volume is mounted.
             if total_seen > 0:
-                print(f"[tracks] Scan finished. Seen {total_seen} files. Pruning is disabled to protect unmounted volumes.")
-                # for rdir in root_dirs:
-                #     ...
+                print(f"[tracks] Scan finished. Seen {total_seen} files. Starting soft-delete prune...")
+                cursor = await db.execute("SELECT id, path FROM tracks")
+                all_tracks = await cursor.fetchall()
+                
+                pruned_count = 0
+                for tr in all_tracks:
+                    # Check if the track's path falls under any of our scanned root directories
+                    if any(tr["path"].startswith(rdir) for rdir in root_dirs):
+                        if not os.path.exists(tr["path"]):
+                            await db.execute("UPDATE tracks SET is_missing = 1 WHERE id = ?", (tr["id"],))
+                            pruned_count += 1
+                        else:
+                            await db.execute("UPDATE tracks SET is_missing = 0 WHERE id = ?", (tr["id"],))
+                
+                if pruned_count > 0:
+                    await db.commit()
+                    print(f"[tracks] Marked {pruned_count} orphaned database entries as missing.")
             
             _scan_progress[job_id]["done"] = True
+
             
         except Exception as e:
             print(f"[tracks] Background scan job error: {e}")
@@ -247,6 +266,9 @@ async def list_tracks(
         # No enabled sources!
         return TrackList(tracks=[], total=0, page=page, page_size=page_size)
 
+    # Filter out missing tracks from the UI list
+    where_clauses.append("is_missing = 0")
+
     if search:
         s = f"%{search}%"
         if search_field == "title":
@@ -261,11 +283,14 @@ async def list_tracks(
         elif search_field == "filename":
             where_clauses.append("filename LIKE ?")
             params.append(s)
+        elif search_field == "raw_tags":
+            where_clauses.append("raw_tags_json LIKE ?")
+            params.append(s)
         else:
             where_clauses.append(
-                "(title LIKE ? OR artist LIKE ? OR album LIKE ? OR filename LIKE ?)"
+                "(title LIKE ? OR artist LIKE ? OR album LIKE ? OR filename LIKE ? OR raw_tags_json LIKE ?)"
             )
-            params.extend([s, s, s, s])
+            params.extend([s, s, s, s, s])
 
     if filter == "missing_lyrics":
         where_clauses.append("has_lyrics = 0")
@@ -376,8 +401,8 @@ async def get_track(track_id: int):
 @router.post("/update")
 async def update_tracks(update: TrackUpdateModel):
     """Manually update metadata for one or more tracks."""
-    from ..services.tagger import write_tags
-    from ..services.scanner import scan_file
+    from backend.app.services.tagger import write_tags
+    from backend.app.services.scanner import scan_file
 
     import json
     import time
@@ -412,7 +437,7 @@ async def update_tracks(update: TrackUpdateModel):
         # Get raw tags for backup (if possible)
         raw_before = {}
         try:
-            from ..services.scanner import fetch_raw_tags
+            from backend.app.services.scanner import fetch_raw_tags
             raw_data = fetch_raw_tags(current_path)
             raw_before = raw_data.get("tags", {})
         except Exception:
@@ -474,7 +499,7 @@ async def update_tracks(update: TrackUpdateModel):
                     """UPDATE tracks SET
                         title=?, artist=?, album=?, genre=?, year=?, composer=?, comment=?,
                         has_lyrics=?, lyrics=?, language=?, has_junk=?, bitrate=?, last_scanned=?,
-                        path=?, filename=?,
+                        path=?, filename=?, raw_tags_json=?,
                         local_fix_count = local_fix_count + 1,
                         last_fix_type='manual',
                         last_fixed_at=?
@@ -493,7 +518,7 @@ async def update_tracks(update: TrackUpdateModel):
                         1 if new_data.get("has_junk", False) else 0,
                         new_data.get("bitrate", row["bitrate"]),
                         new_data.get("last_scanned", timestamp),
-                        path, Path(path).name,
+                        path, Path(path).name, new_data.get("raw_tags_json", "{}"),
                         timestamp,
                         track_id
                     )
@@ -538,8 +563,8 @@ async def local_fix_tracks(update: LocalFixRequest):
     Uses current file tags as source of truth, but writes them back
     using the latest standardized LexiTag mapping conventions.
     """
-    from ..services.tagger import write_tags
-    from ..services.scanner import scan_file
+    from backend.app.services.tagger import write_tags
+    from backend.app.services.scanner import scan_file
 
     db = await get_db()
     updated = []
@@ -562,7 +587,22 @@ async def local_fix_tracks(update: LocalFixRequest):
             continue
 
         # 2. Extract and Deep-Clean tags using Local Heuristics
-        from ..services.local_cleaner import pre_clean_tags
+        from backend.app.services.local_cleaner import pre_clean_tags, clean_value
+        from backend.app.services.scanner import fetch_raw_tags, _check_junk
+        
+        raw_before_audit = fetch_raw_tags(path).get("tags", {})
+        
+        # AGGRESSIVE RAW TAG JUNK PURGE
+        # Deliberately locate custom raw fields with junk and pass them as deletions
+        raw_tags_to_purge = {}
+        for k_raw, val_raw in raw_before_audit.items():
+            k_str = str(k_raw)
+            v_str = str(val_raw[0]) if isinstance(val_raw, list) and val_raw else str(val_raw)
+            if _check_junk(k_str) or _check_junk(v_str):
+                # Standard fields are already handled by the cleaned dictionary
+                if k_str.lower() not in ["title", "artist", "album", "genre", "year", "composer", "comment", "language"]:
+                    raw_tags_to_purge[k_str] = ""
+        
         raw_tags = {
             "title": file_data["title"],
             "artist": file_data["artist"],
@@ -578,23 +618,21 @@ async def local_fix_tracks(update: LocalFixRequest):
         raw_lyrics = file_data.get("lyrics", "")
         clean_lyrics = ""
         if raw_lyrics:
-            from ..services.local_cleaner import clean_value
             clean_lyrics = clean_value(raw_lyrics, "USLT")
         
         # 3. Write back with standardized tagger
-        # This will write to multiple keys (e.g. lyrics -> unsyncedlyrics)
         success = write_tags(
             path, 
             tags, 
             clean_lyrics, 
             file_data.get("language", ""),
-            None # Don't pass raw_tags, we want standard rewrite
+            raw_tags=raw_tags_to_purge
         )
         
         if success:
             # Record History and Re-scan to update DB
             try:
-                from ..services.scanner import fetch_raw_tags
+                from backend.app.services.scanner import fetch_raw_tags
                 import time, json
                 
                 # Fetch original tags for history before re-scan
@@ -624,6 +662,7 @@ async def local_fix_tracks(update: LocalFixRequest):
                     changed_tags = {k: v for k, v in tags.items() if v != original_tags.get(k)}
                     
                     # Record history
+                    raw_after_audit = fetch_raw_tags(path).get("tags", {})
                     await db.execute(
                         """INSERT INTO tag_history (track_id, track_path, original_tags, changed_tags, timestamp, raw_before, raw_after)
                            VALUES (?, ?, ?, ?, ?, ?, ?)""",
@@ -633,17 +672,17 @@ async def local_fix_tracks(update: LocalFixRequest):
                             json.dumps(changed_tags), 
                             timestamp,
                             json.dumps(raw_before),
-                            json.dumps(raw_before) # For local fix, raw_after is mostly the same
+                            json.dumps(raw_after_audit)
                         )
                     )
-
-                    # Update tracks table
+                    
+                    # Update tracks table with fresh raw_tags_json
                     await db.execute(
                         """UPDATE tracks SET
                             title=?, artist=?, album=?, genre=?, year=?, composer=?, comment=?,
                             has_lyrics=?, lyrics=?, language=?, has_junk=?, last_scanned=?,
                             local_fix_count = local_fix_count + 1, last_fix_type = 'local',
-                            last_fixed_at=?
+                            last_fixed_at=?, raw_tags_json=?
                            WHERE id=?""",
                         (
                             new_data["title"], new_data["artist"], new_data["album"],
@@ -655,6 +694,7 @@ async def local_fix_tracks(update: LocalFixRequest):
                             1 if new_data["has_junk"] else 0,
                             new_data["last_scanned"],
                             timestamp,
+                            json.dumps(raw_after_audit),
                             track_id
                         )
                     )
@@ -686,9 +726,14 @@ async def get_raw_tags(track_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="Track not found")
 
-    audio = MutagenFile(row["path"])
-    if audio is None:
-        raise HTTPException(status_code=400, detail="Could not read file tags")
+    try:
+        audio = MutagenFile(row["path"])
+        if audio is None:
+            raise HTTPException(status_code=400, detail="Could not read file tags")
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Audio file not found on disk. Is the volume mounted?")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
 
     # Serialize tags as string-indexed dict
     raw_tags = {}
@@ -717,16 +762,19 @@ async def get_raw_tags(track_id: int):
 @router.get("/{track_id}/lyrics")
 async def get_track_lyrics(track_id: int):
     """Fetch lyrics directly from the file on disk (Single Source of Truth)."""
-    from ..services.scanner import scan_file
+    from backend.app.services.scanner import scan_file
     db = await get_db()
     cursor = await db.execute("SELECT path FROM tracks WHERE id = ?", (track_id,))
     row = await cursor.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Track not found")
         
-    data = scan_file(row["path"])
-    if not data:
-        raise HTTPException(status_code=500, detail="Could not read file")
+    try:
+        data = scan_file(row["path"])
+        if not data:
+            raise HTTPException(status_code=500, detail="Could not read file")
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Audio file not found on disk. Is the volume mounted?")
         
     return {"lyrics": data.get("lyrics", "")}
 
@@ -787,7 +835,7 @@ async def refresh_local_metadata(track_id: str):
         raise HTTPException(status_code=404, detail="Track not found")
         
     # Import scanner and cleaner here to avoid circulars if any
-    from ..services.scanner import scan_file
+    from backend.app.services.scanner import scan_file
     data = scan_file(row["path"])
     if not data:
         raise HTTPException(status_code=500, detail="Failed to re-scan file")

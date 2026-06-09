@@ -2,7 +2,7 @@ import re
 import time
 import logging
 from typing import Dict, List, Optional
-from ..database import get_db
+from backend.app.database import get_db
 
 logger = logging.getLogger(__name__)
 

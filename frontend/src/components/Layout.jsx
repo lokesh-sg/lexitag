@@ -13,7 +13,12 @@ export default function Layout({ children }) {
   const [showLyrics, setShowLyrics] = React.useState(false);
 
   React.useEffect(() => {
-    fetchHealth().then(data => setVersion(data.version)).catch(() => {});
+    fetch('/api/health')
+      .then(res => res.json())
+      .then(data => {
+        if (data.version) setVersion('V' + data.version);
+      })
+      .catch(() => setVersion('V0.1.3'));
   }, []);
 
   React.useEffect(() => {
@@ -42,8 +47,8 @@ export default function Layout({ children }) {
                 <span className="text-amber-400">Tag</span>
               </div>
               {version && (
-                <span className="text-[10px] font-mono font-medium text-ink-muted/50 bg-surface-3 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                  v{version}
+                <span className="text-[10px] font-medium bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700 font-mono">
+                  {version || 'V0.1.3'}
                 </span>
               )}
             </h1>

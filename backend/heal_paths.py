@@ -1,33 +1,64 @@
-
 import sqlite3
-from pathlib import Path
+import os
 
-def heal():
-    db_path = "lexitage.db"
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
+DB_PATH = "/Users/lokeshg/LexiTag/dev/data/lexitage.db"
 
-    # Track 1
-    # Old DB path: .../Jency Anthony, S. P. Sailaja, Malaysia Vasudevan - Aayiram Malargale Malarungal.flac
-    # New Disk path: .../S. P. Sailaja, Malaysia Vasudevan, Jency - Aayiram Malargale Malarungal.flac
-    new_path_1 = "/Volumes/Media/Music/UnOrganized/Various Artists/Classical Hits, Vol. 1/S. P. Sailaja, Malaysia Vasudevan, Jency - Aayiram Malargale Malarungal.flac"
-    new_filename_1 = "S. P. Sailaja, Malaysia Vasudevan, Jency - Aayiram Malargale Malarungal.flac"
-    
-    print(f"Healing track 7951...")
-    c.execute("UPDATE tracks SET path = ?, filename = ? WHERE id = 7951", (new_path_1, new_filename_1))
+def heal_db_paths():
+    if not os.path.exists(DB_PATH):
+        print(f"Error: Database not found at {DB_PATH}")
+        return
 
-    # Track 2
-    # Old DB path: .../K.J. Yesudas, Swarnalatha - Aaradi Chuvaruthaan.flac
-    # New Disk path: .../K.J. Yesudas, Swarnalatha - Aaradi Chuvaru Thaan.flac
-    new_path_2 = "/Volumes/Media/Music/UnOrganized/KJ Yesudas & P.Jayachandran Ultimate Collections/K.J. Yesudas, Swarnalatha - Aaradi Chuvaru Thaan.flac"
-    new_filename_2 = "K.J. Yesudas, Swarnalatha - Aaradi Chuvaru Thaan.flac"
-    
-    print(f"Healing track 10546...")
-    c.execute("UPDATE tracks SET path = ?, filename = ? WHERE id = 10546", (new_path_2, new_filename_2))
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Base Path Mapping
+    # Macdonald -> Container
+    MAPPING = {
+        "/Volumes/Media/Music/Organized": "/app/music",
+        "/Volumes/Downloads/LexiTag/music": "/app/music",
+        "/Volumes/Media/Music/UnOrganized": "/app/music/UnOrganized" # Just in case
+    }
+
+    # 1. Update Library Sources
+    print("Updating library_sources...")
+    for old, new in MAPPING.items():
+        cursor.execute("UPDATE library_sources SET path = ? WHERE path = ?", (new, old))
+        print(f"Mapped source {old} -> {new}")
+
+    # 2. Update Tracks Table
+    print("\nUpdating tracks paths...")
+    total_updated = 0
+    for old, new in MAPPING.items():
+        # Using REPLACE to upgrade base paths
+        cursor.execute("UPDATE tracks SET path = REPLACE(path, ?, ?)", (old, new))
+        rowcount = cursor.rowcount
+        total_updated += rowcount
+        print(f"Updated {rowcount} tracks for {old} -> {new}")
+
+    # 3. Update History Table
+    print("\nUpdating history paths...")
+    for old, new in MAPPING.items():
+        cursor.execute("UPDATE tag_history SET track_path = REPLACE(track_path, ?, ?)", (old, new))
+        print(f"Updated {cursor.rowcount} history entries for {old} -> {new}")
+
+    # 4. Cleanup Duplicates (if some /app/music paths already were created)
+    # This might happen if they ran a scan on Ubuntu already.
+    print("\nCleaning up duplicates from previous failed scans...")
+    # Keep the row with the most metadata or history (simplest: keep the one with lower ID or most recently scanned)
+    # We'll GROUP BY path and keep the first one
+    cursor.execute("""
+        DELETE FROM tracks
+        WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM tracks
+            GROUP BY path
+        );
+    """)
+    print(f"Deleted {cursor.rowcount} duplicate track entries.")
 
     conn.commit()
-    print("Database healed successfully.")
     conn.close()
+    print("\nDatabase paths healed successfully.")
 
 if __name__ == "__main__":
-    heal()
+    heal_db_paths()

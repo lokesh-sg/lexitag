@@ -20,7 +20,7 @@ import datetime
 def _log(msg):
     """Log to a file in the data directory for debugging. Silenced in production."""
     try:
-        from ..config import settings
+        from backend.app.config import settings
         if settings.ENV == "production":
             return  # No debug logs in production
         import os
@@ -99,6 +99,63 @@ def _parse_lrc_to_sylt(lrc_text):
     entries.sort(key=lambda x: x[1])
     return entries
 
+REVERSE_LANG_MAP = {
+    "eng": "English", "spa": "Spanish", "fra": "French", "deu": "German",
+    "ita": "Italian", "por": "Portuguese", "jpn": "Japanese", "kor": "Korean",
+    "zho": "Chinese", "hin": "Hindi", "ara": "Arabic", "rus": "Russian",
+    "tam": "Tamil", "mal": "Malayalam", "tel": "Telugu", "kan": "Kannada",
+    "en": "English", "es": "Spanish", "fr": "French", "de": "German", "ta": "Tamil"
+}
+
+def _get_full_lang(lang: str) -> str:
+    if not lang: return ""
+    l = lang.lower()
+    return REVERSE_LANG_MAP.get(l, lang.capitalize() if len(lang) > 3 else lang)
+
+import mutagen
+from mutagen.id3 import TCON
+
+def append_language_genre(file_path, language_word):
+    """Universally appends a language as a strict secondary genre array element."""
+    try:
+        audio = mutagen.File(file_path)
+        if audio is None or audio.tags is None:
+            _log(f"Append Language: Un-taggable or corrupted file {file_path}")
+            return False
+
+        tags = audio.tags
+        tag_type = type(tags).__name__
+
+        # 1. MP3 and WAV (ID3 Tags)
+        if tag_type == 'ID3':
+            existing = tags.getall("TCON")
+            genre_list = existing[0].text if existing else []
+            if language_word not in genre_list:
+                genre_list.append(language_word)
+            # encoding=3 ensures utf-8 and safe multi-value null byte separators
+            tags.add(TCON(encoding=3, text=genre_list))
+
+        # 2. AAC / M4A / MP4 (Apple iTunes Tags)
+        elif tag_type == 'MP4Tags':
+            genre_list = tags.get('\xa9gen', [])
+            if language_word not in genre_list:
+                genre_list.append(language_word)
+            tags['\xa9gen'] = genre_list
+
+        # 3. FLAC / Ogg / OPUS (Vorbis Comments)
+        else: 
+            # Vorbis is a case-insensitive multi-dict
+            genre_list = tags.get('genre', [])
+            if language_word not in genre_list:
+                genre_list.append(language_word)
+            tags['genre'] = genre_list
+
+        audio.save()
+        return True
+    except Exception as e:
+        _log(f"Error appending native language genre to {file_path}: {e}")
+        return False
+
 def write_tags(filepath: str, tags: dict, lyrics: str = "", language: str = "", raw_tags: dict = None) -> bool:
     """
     Write metadata back to an audio file.
@@ -160,6 +217,18 @@ def _get_lang_code(lang: str) -> str:
 
 def _apply_id3_frames(id3: ID3, tags: dict, lyrics: str, language: str, raw_tags: dict, filepath: str):
     """Core logic to apply ID3 frames to an ID3 object."""
+    # 0. Universal Purge of Hidden Technical / Junk Tracking Frames
+    junk_patterns = ["musicbrainz", "acoustid", "fingerprint", "barcode", "ufid", "priv", "mcdi", "tlen", "tsrc", "tsse", "tenc"]
+    keys_to_delete = []
+    for k in id3.keys():
+        if any(p in k.lower() for p in junk_patterns):
+            keys_to_delete.append(k)
+    for k in keys_to_delete:
+        try:
+            del id3[k]
+        except Exception:
+            pass
+
     # 1. Apply standard mapped tags
     if tags.get("title") is not None:
         id3["TIT2"] = TIT2(encoding=3, text=[_flatten_tag(tags["title"])])
@@ -168,7 +237,13 @@ def _apply_id3_frames(id3: ID3, tags: dict, lyrics: str, language: str, raw_tags
     if tags.get("album") is not None:
         id3["TALB"] = TALB(encoding=3, text=[_flatten_tag(tags["album"])])
     if tags.get("genre") is not None:
-        id3["TCON"] = TCON(encoding=3, text=[_flatten_tag(tags["genre"])])
+        genres = tags["genre"]
+        if isinstance(genres, list):
+            # Mutagen's TCON text expects a list of exact strings (ID3 handles multi separator logic)
+            id3["TCON"] = TCON(encoding=3, text=[_flatten_tag(g) for g in genres])
+        else:
+            # Fallback for generic string
+            id3["TCON"] = TCON(encoding=3, text=[_flatten_tag(genres)])
     if tags.get("year") is not None:
         id3["TDRC"] = TDRC(encoding=3, text=[_flatten_tag(tags["year"])])
     if tags.get("composer") is not None:
@@ -211,8 +286,12 @@ def _apply_id3_frames(id3: ID3, tags: dict, lyrics: str, language: str, raw_tags
         STANDARD_FRAMES = {"TIT2", "TPE1", "TALB", "TCON", "TDRC", "TCOM", "TLAN", "USLT", "COMM"}
         
         for key, val in raw_tags.items():
-            if key in HUMAN_KEYS or any(key.startswith(s) for s in STANDARD_FRAMES):
-                continue
+            # If we're writing a new value, skip standard mapped frames to avoid double-writes
+            # But if we're DELETING (val is empty), allow purging standard frames too!
+            is_deletion = val == "" or val == [] or val is None
+            if not is_deletion:
+                if key in HUMAN_KEYS or any(key.startswith(s) for s in STANDARD_FRAMES):
+                    continue
             
             # Skip binary data placeholders
             if val == "__ALBUM_ART__":
@@ -415,33 +494,44 @@ def _write_wav(filepath: str, tags: dict, lyrics: str, language: str, raw_tags: 
     
     def _do_write(path):
         # 1. Write ID3 Tags (Standard and most robust)
+        from mutagen.wave import WAVE
         audio = WAVE(path)
         if audio.tags is None:
             audio.add_tags()
         _apply_id3_frames(audio.tags, tags, lyrics, language, raw_tags, path)
-        # Try saving with v2.4 to support full-word languages in TLAN
         try:
             audio.save(v2_version=4)
         except TypeError:
-            # Fallback if this version of mutagen doesn't support v2_version on WAVE.save()
             audio.save()
         
-        # 2. Try to write RIFF INFO (Optional, for Windows Explorer)
+        # 2. Sync / Purge RIFF INFO (Critical for Windows Explorer and some legacy apps)
         try:
-            # Try to get RIFF INFO if available in this mutagen version
             import mutagen.riff
             info = mutagen.riff.INFO(path)
-            if tags.get("title"): info["INAM"] = [_flatten_tag(tags["title"])]
-            if tags.get("artist"): info["IART"] = [_flatten_tag(tags["artist"])]
-            if tags.get("album"): info["IPRD"] = [_flatten_tag(tags["album"])]
-            if tags.get("genre"): info["IGNR"] = [_flatten_tag(tags["genre"])]
-            if tags.get("year"): info["ICRD"] = [_flatten_tag(tags["year"])]
-            if tags.get("comment"): info["ICMT"] = [_flatten_tag(tags["comment"])]
-            if tags.get("composer"): info["IMUS"] = [_flatten_tag(tags["composer"])]
+            
+            # Map standard fields
+            if tags.get("title") is not None: info["INAM"] = [_flatten_tag(tags["title"])]
+            if tags.get("artist") is not None: info["IART"] = [_flatten_tag(tags["artist"])]
+            if tags.get("album") is not None: info["IPRD"] = [_flatten_tag(tags["album"])]
+            if tags.get("genre") is not None: info["IGNR"] = [_flatten_tag(tags["genre"])]
+            if tags.get("year") is not None: info["ICRD"] = [_flatten_tag(tags["year"])]
+            if tags.get("comment") is not None: info["ICMT"] = [_flatten_tag(tags["comment"])]
+            if tags.get("composer") is not None: info["IMUS"] = [_flatten_tag(tags["composer"])]
+            
+            # AGGRESSIVE PURGE: Delete any RIFF INFO key that matches junk
+            from backend.app.services.scanner import _check_junk
+            keys_to_del = []
+            for riff_k, riff_v in info.items():
+                v_str = str(riff_v[0]) if isinstance(riff_v, list) and riff_v else str(riff_v)
+                if _check_junk(riff_k) or _check_junk(v_str):
+                    keys_to_del.append(riff_k)
+            for rk in keys_to_del:
+                del info[rk]
+                
             info.save()
-            _log("RIFF INFO tags also synced")
-        except (ImportError, AttributeError, Exception) as e:
-            # If RIFF INFO fails, it's non-critical since ID3 is already written
+            _log("RIFF INFO tags synced and purged")
+        except Exception as e:
+            _log(f"RIFF INFO sync warning: {e}")
             pass
             
     # ── Try 1: Standard write ──
@@ -486,11 +576,29 @@ def _write_flac(filepath: str, tags: dict, lyrics: str, language: str, raw_tags:
     if audio.tags is None:
         audio.add_tags()
 
+    # 0. Universal Purge of Hidden Technical / Junk Tracking Frames
+    junk_patterns = ["musicbrainz", "acoustid", "fingerprint", "barcode", "ufid", "priv", "mcdi", "tlen", "tsrc", "tsse", "tenc"]
+    keys_to_delete = []
+    for k in audio.tags.keys():
+        if any(p in k.lower() for p in junk_patterns):
+            keys_to_delete.append(k)
+    for k in keys_to_delete:
+        try:
+            del audio.tags[k]
+        except Exception:
+            pass
+
     # 1. Standard tags
     if tags.get("title") is not None: audio["title"] = _flatten_tag(tags["title"])
     if tags.get("artist") is not None: audio["artist"] = _flatten_tag(tags["artist"])
     if tags.get("album") is not None: audio["album"] = _flatten_tag(tags["album"])
-    if tags.get("genre") is not None: audio["genre"] = _flatten_tag(tags["genre"])
+    if tags.get("genre") is not None:
+        genres = tags["genre"]
+        if isinstance(genres, list):
+            # FLAC uses list natively for multi-tags
+            audio["genre"] = [_flatten_tag(g) for g in genres]
+        else:
+            audio["genre"] = [_flatten_tag(genres)]
     if tags.get("year") is not None: audio["date"] = _flatten_tag(tags["year"])
     if tags.get("composer") is not None: audio["composer"] = _flatten_tag(tags["composer"])
     lang_code = _get_lang_code(language)
@@ -516,8 +624,12 @@ def _write_flac(filepath: str, tags: dict, lyrics: str, language: str, raw_tags:
         standard_keys = {"title", "artist", "album", "genre", "date", "composer", "language", "lyrics", "comment"}
         ID3_SYNONYMS = {"TIT2", "TPE1", "TALB", "TCON", "TDRC", "TCOM", "TLAN", "USLT", "COMM"}
         for key, val in raw_tags.items():
-            if key.lower() in standard_keys or key in ID3_SYNONYMS or key == "suggested_filename":
-                continue
+            # If we're writing a new value, skip standard mapped frames to avoid double-writes
+            # But if we're DELETING (val is empty), allow purging standard frames too!
+            is_deletion = val == "" or val == [] or val is None
+            if not is_deletion:
+                if key.lower() in standard_keys or key in ID3_SYNONYMS or key == "suggested_filename":
+                    continue
             
             # Skip binary data placeholders
             if val == "__ALBUM_ART__":
@@ -544,49 +656,102 @@ def _write_mp4(filepath: str, tags: dict, lyrics: str, language: str, raw_tags: 
     if audio.tags is None:
         audio.add_tags()
 
-    # 1. Standard atoms
-    if tags.get("title") is not None: audio["\xa9nam"] = [_flatten_tag(tags["title"])]
-    if tags.get("artist") is not None: audio["\xa9ART"] = [_flatten_tag(tags["artist"])]
-    if tags.get("album") is not None: audio["\xa9alb"] = [_flatten_tag(tags["album"])]
-    if tags.get("genre") is not None: audio["\xa9gen"] = [_flatten_tag(tags["genre"])]
-    if tags.get("year") is not None: audio["\xa9day"] = [_flatten_tag(tags["year"])]
+    # 0. Universal Purge of Hidden Technical / Junk Tracking Frames
+    junk_patterns = ["musicbrainz", "acoustid", "fingerprint", "barcode", "ufid", "priv", "mcdi", "tlen", "tsrc", "tsse", "tenc"]
+    keys_to_delete = []
+    for k in audio.tags.keys():
+        if any(p in k.lower() for p in junk_patterns):
+            keys_to_delete.append(k)
+    for k in keys_to_delete:
+        try:
+            del audio.tags[k]
+        except Exception:
+            pass
+
+    # 1. Standard atoms (Fall back to direct mp4 keys if standard mapped keys are missing)
+    v_title = tags.get("title") if tags.get("title") is not None else raw_tags.get("\xa9nam")
+    if v_title is not None: audio["\xa9nam"] = [_flatten_tag(v_title)]
+    
+    v_art = tags.get("artist") if tags.get("artist") is not None else raw_tags.get("\xa9ART")
+    if v_art is not None: audio["\xa9ART"] = [_flatten_tag(v_art)]
+    
+    v_alb = tags.get("album") if tags.get("album") is not None else raw_tags.get("\xa9alb")
+    if v_alb is not None: audio["\xa9alb"] = [_flatten_tag(v_alb)]
+    
+    v_gen = tags.get("genre") if tags.get("genre") is not None else raw_tags.get("\xa9gen")
+    if v_gen is not None:
+        if isinstance(v_gen, list):
+            audio["\xa9gen"] = [_flatten_tag(g) for g in v_gen]
+        else:
+            audio["\xa9gen"] = [_flatten_tag(v_gen)]
+            
+    v_yr = tags.get("year") if tags.get("year") is not None else raw_tags.get("\xa9day")
+    if v_yr is not None: audio["\xa9day"] = [_flatten_tag(v_yr)]
+    
     if lyrics is not None:
-        # Strictly \xa9lyr for MP4 as requested
         for k in ["\xa9lyr", "lyrics"]:
             if k in audio:
                 del audio[k]
         if lyrics:
             audio["\xa9lyr"] = [lyrics]
+            
     if language is not None: 
         lang_code = _get_lang_code(language)
-        # 1. Standard: 3-letter code in \xa9lan atom
         audio["\xa9lan"] = [lang_code]
-        # 2. Friendly: Full word in a freeform atom
         if len(language) > 3:
             audio["----:com.apple.iTunes:Language"] = [language.encode('utf-8')]
-    if tags.get("composer") is not None: audio["\xa9wrt"] = [_flatten_tag(tags["composer"])]
-    if tags.get("comment") is not None: audio["\xa9cmt"] = [_flatten_tag(tags["comment"])]
+            
+    v_comp = tags.get("composer") if tags.get("composer") is not None else raw_tags.get("\xa9wrt")
+    if v_comp is not None: audio["\xa9wrt"] = [_flatten_tag(v_comp)]
+    
+    v_cmt = tags.get("comment") if tags.get("comment") is not None else raw_tags.get("\xa9cmt")
+    if v_cmt is not None: audio["\xa9cmt"] = [_flatten_tag(v_cmt)]
 
     # 2. Raw atoms
     if raw_tags:
         standard_keys = {"\xa9nam", "\xa9ART", "\xa9alb", "\xa9gen", "\xa9day", "\xa9lyr", "\xa9lan", "\xa9wrt", "\xa9cmt"}
         ID3_SYNONYMS = {"TIT2", "TPE1", "TALB", "TCON", "TDRC", "TCOM", "TLAN", "USLT", "COMM"}
         for key, val in raw_tags.items():
-            if key in standard_keys or key in ID3_SYNONYMS or key == "suggested_filename":
-                continue
+            # If we're writing a new value, skip standard mapped frames to avoid double-writes
+            # But if we're DELETING (val is empty), allow purging standard frames too!
+            is_deletion = val == "" or val == [] or val is None
+            if not is_deletion:
+                if key in standard_keys or key in ID3_SYNONYMS or key == "suggested_filename":
+                    continue
 
-            # Skip binary data placeholders, technical atoms, and freeform frames that often cause type conflicts
-            if val == "__ALBUM_ART__" or key == "stik" or key.startswith("----"):
+            # Skip binary data placeholders
+            if val == "__ALBUM_ART__" or key == "stik":
                 continue
             
             # Robust Deletion
-            if val == "" or val == [] or val is None:
+            if val == "" or val == [] or val is None or val == "b''":
                 if key in audio:
                     del audio[key]
                 continue
                 
             try:
-                audio[key] = [_flatten_tag(v) for v in val] if isinstance(val, list) else [_flatten_tag(val)]
+                if key.startswith("----"):
+                    # Handle raw byte lists natively
+                    if isinstance(val, list):
+                        safe_val = []
+                        for v in val:
+                            vf = _flatten_tag(v)
+                            # Remove literal b'' encapsulation from stringified repr
+                            if vf.startswith("b'") and vf.endswith("'"): vf = vf[2:-1]
+                            if vf: safe_val.append(vf.encode("utf-8"))
+                        if not safe_val:
+                            if key in audio: del audio[key]
+                        else:
+                            audio[key] = safe_val
+                    else:
+                        vf = _flatten_tag(val)
+                        if vf.startswith("b'") and vf.endswith("'"): vf = vf[2:-1]
+                        if vf:
+                            audio[key] = [vf.encode("utf-8")]
+                        elif key in audio:
+                            del audio[key]
+                else:
+                    audio[key] = [_flatten_tag(v) for v in val] if isinstance(val, list) else [_flatten_tag(val)]
             except Exception as e:
                 print(f"[tagger] Warning: Could not write MP4 atom {key}: {e}")
 
@@ -605,7 +770,12 @@ def _write_generic(filepath: str, tags: dict, lyrics: str, language: str, raw_ta
     if tags.get("title") is not None: audio["title"] = [_flatten_tag(tags["title"])]
     if tags.get("artist") is not None: audio["artist"] = [_flatten_tag(tags["artist"])]
     if tags.get("album") is not None: audio["album"] = [_flatten_tag(tags["album"])]
-    if tags.get("genre") is not None: audio["genre"] = [_flatten_tag(tags["genre"])]
+    if tags.get("genre") is not None:
+        genres = tags["genre"]
+        if isinstance(genres, list):
+            audio["genre"] = [_flatten_tag(g) for g in genres]
+        else:
+            audio["genre"] = [_flatten_tag(genres)]
     if tags.get("year") is not None: audio["date"] = [_flatten_tag(tags["year"])]
 
     if raw_tags:

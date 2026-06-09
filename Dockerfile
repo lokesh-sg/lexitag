@@ -1,7 +1,7 @@
 # ==========================================
 # Stage 1: Build Frontend
 # ==========================================
-FROM node:20-alpine AS frontend-build
+FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-build
 
 WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
@@ -18,7 +18,7 @@ WORKDIR /app
 
 # Install system deps
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc ffmpeg && \
+    apt-get install -y --no-install-recommends gcc libc6-dev python3-dev ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python deps
@@ -31,8 +31,13 @@ COPY backend/ ./backend/
 # Copy built frontend
 COPY --from=frontend-build /build/frontend/dist /app/static
 
-# Create data directory
-RUN mkdir -p /app/data /app/music
+# Create data directory and non-root user
+RUN mkdir -p /app/data /app/music && \
+    adduser --disabled-password --gecos '' lexitag && \
+    chown -R lexitag:lexitag /app
+
+# Switch to non-root user
+USER lexitag
 
 # Expose port
 EXPOSE 3030

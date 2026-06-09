@@ -24,7 +24,8 @@ export default function PlayerBar() {
   const { 
     currentTrack, isPlaying, currentTime, duration, volume, 
     togglePlay, seek, changeVolume, next, prev, stop,
-    repeatMode, setRepeatMode, shuffleMode, setShuffle
+    repeatMode, setRepeatMode, shuffleMode, setShuffle,
+    isCasting, activeRenderer, stopCast
   } = player;
 
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -266,19 +267,33 @@ export default function PlayerBar() {
                </svg>
             </button>
 
-            {/* Cast */}
-            <button
-              onClick={() => setShowCast(true)}
-              disabled={!currentTrack}
-              className="p-1.5 rounded-md text-ink-faint hover:text-amber-400 hover:bg-surface-3/60 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
-              title="Cast to UPnP device"
-              id="cast-btn"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
-                <line x1="2" y1="20" x2="2.01" y2="20" />
-              </svg>
-            </button>
+            {/* Cast Controls */}
+            <div className="flex items-center gap-1 group/cast">
+              {isCasting && (
+                <button
+                  onClick={stopCast}
+                  className="p-1 px-1.5 rounded-md text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-all border border-red-500/20"
+                  title="Disconnect / Stop Casting"
+                  id="stop-cast-btn"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
+              <button
+                onClick={() => setShowCast(true)}
+                disabled={!currentTrack}
+                className={`p-1.5 rounded-md transition-all disabled:opacity-25 disabled:cursor-not-allowed ${isCasting ? 'text-amber-400 bg-amber-400/10' : 'text-ink-faint hover:text-amber-400 hover:bg-surface-3/60'}`}
+                title={isCasting ? `Casting to ${activeRenderer?.name}` : "Cast to UPnP device"}
+                id="cast-btn"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+                  <line x1="2" y1="20" x2="2.01" y2="20" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>

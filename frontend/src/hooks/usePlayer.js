@@ -1,5 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { getStreamUrl } from '../api';
+import { 
+    getStreamUrl, 
+    castToRenderer, 
+    pauseRenderer, 
+    resumeRenderer, 
+    stopRenderer,
+    setRendererVolume,
+    seekRenderer
+} from '../api';
 
 export function usePlayer() {
     const audioRef = useRef(null);
@@ -8,6 +16,10 @@ export function usePlayer() {
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [volume, setVolume] = useState(0.8);
+    
+    // --- Cast State ---
+    const [isCasting, setIsCasting] = useState(false);
+    const [activeRenderer, setActiveRenderer] = useState(null);
     
     // --- Advanced Player State ---
     const [queue, setQueue] = useState([]);
@@ -47,63 +59,21 @@ export function usePlayer() {
     // Helper to get effective queue
     const getActiveQueue = useCallback(() => (shuffleMode ? shuffledQueue : queue), [shuffleMode, shuffledQueue, queue]);
 
-    // Play next track logic
-    const next = useCallback(() => {
-        const activeQueue = getActiveQueue();
-        if (activeQueue.length === 0) return;
-
-        let nextIdx = currentIndex + 1;
-        if (nextIdx >= activeQueue.length) {
-            if (repeatMode === 'all') nextIdx = 0;
-            else return; // Stop at end
-        }
-        playTrack(activeQueue[nextIdx], activeQueue, nextIdx);
-    }, [currentIndex, repeatMode, shuffleMode, queue, shuffledQueue]);
-
-    // Play previous track logic
-    const prev = useCallback(() => {
-        const activeQueue = getActiveQueue();
-        if (activeQueue.length === 0) return;
-
-        // If we've played > 3s, just restart the track
-        if (audioRef.current && audioRef.current.currentTime > 3) {
-            audioRef.current.currentTime = 0;
-            return;
-        }
-
-        let prevIdx = currentIndex - 1;
-        if (prevIdx < 0) {
-            if (repeatMode === 'all') prevIdx = activeQueue.length - 1;
-            else prevIdx = 0;
-        }
-        playTrack(activeQueue[prevIdx], activeQueue, prevIdx);
-    }, [currentIndex, repeatMode, shuffleMode, queue, shuffledQueue]);
-
-    const stop = useCallback(() => {
-        const audio = audioRef.current;
-        if (audio) {
-            audio.pause();
-            audio.currentTime = 0;
-            setIsPlaying(false);
-        }
-    }, []);
-
-    const handleTrackEnded = useCallback(() => {
-        if (repeatMode === 'one') {
-            if (audioRef.current) {
-                audioRef.current.currentTime = 0;
-                audioRef.current.play();
-            }
-        } else {
-            next();
-        }
-    }, [repeatMode, next]);
-
-    const playTrack = useCallback((track, newQueue = null, index = -1) => {
+    const playTrack = useCallback(async (track, newQueue = null, index = -1) => {
         const audio = audioRef.current;
         if (!audio) return;
 
-        // If a new queue is provided, set it
+        // If casting, trigger remote play instead of local
+        if (isCasting && activeRenderer) {
+            try {
+                setCurrentTrack(track);
+                await castToRenderer(activeRenderer.udn, track.id);
+                setIsPlaying(true);
+                return;
+            } catch (err) { console.error('Casting play error:', err); }
+        }
+
+        // --- Standard Local Play Logic ---
         if (newQueue) {
             setQueue(newQueue);
             if (shuffleMode) {
@@ -126,7 +96,107 @@ export function usePlayer() {
         setCurrentTrack(track);
         audio.src = getStreamUrl(track.id);
         audio.play().catch(err => console.error('Playback error:', err));
-    }, [currentTrack, isPlaying, shuffleMode]);
+    }, [currentTrack, isPlaying, shuffleMode, isCasting, activeRenderer]);
+
+    // Play next track logic
+    const next = useCallback(() => {
+        const activeQueue = getActiveQueue();
+        if (activeQueue.length === 0) return;
+
+        let nextIdx = currentIndex + 1;
+        if (nextIdx >= activeQueue.length) {
+            if (repeatMode === 'all') nextIdx = 0;
+            else return; // Stop at end
+        }
+        playTrack(activeQueue[nextIdx], activeQueue, nextIdx);
+    }, [currentIndex, repeatMode, shuffleMode, queue, shuffledQueue, playTrack]);
+
+    // Play previous track logic
+    const prev = useCallback(() => {
+        const activeQueue = getActiveQueue();
+        if (activeQueue.length === 0) return;
+
+        // If we've played > 3s, just restart the track
+        if (audioRef.current && audioRef.current.currentTime > 3) {
+            audioRef.current.currentTime = 0;
+            return;
+        }
+
+        let prevIdx = currentIndex - 1;
+        if (prevIdx < 0) {
+            if (repeatMode === 'all') prevIdx = activeQueue.length - 1;
+            else prevIdx = 0;
+        }
+        playTrack(activeQueue[prevIdx], activeQueue, prevIdx);
+    }, [currentIndex, repeatMode, shuffleMode, queue, shuffledQueue, playTrack]);
+
+    const stop = useCallback(async () => {
+        if (isCasting && activeRenderer) {
+            try {
+                await stopRenderer(activeRenderer.udn);
+                setIsPlaying(false);
+                setIsCasting(false);
+            } catch (e) { console.error('UPnP Stop error:', e); }
+            return;
+        }
+
+        const audio = audioRef.current;
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+            setIsPlaying(false);
+        }
+    }, [isCasting, activeRenderer]);
+
+    const handleTrackEnded = useCallback(() => {
+        if (repeatMode === 'one') {
+            if (audioRef.current) {
+                audioRef.current.currentTime = 0;
+                audioRef.current.play();
+            }
+        } else {
+            next();
+        }
+    }, [repeatMode, next]);
+
+    const startCast = useCallback(async (renderer) => {
+        if (!currentTrack) return;
+        try {
+            // 1. Set state
+            setIsCasting(true);
+            setActiveRenderer(renderer);
+
+            // 2. Silence local audio instantly
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.src = "";
+            }
+
+            // 3. Trigger remote play
+            await castToRenderer(renderer.udn, currentTrack.id);
+            setIsPlaying(true);
+        } catch (err) {
+            console.error('Cast Error:', err);
+            setIsCasting(false);
+        }
+    }, [currentTrack]);
+
+    const stopCast = useCallback(async () => {
+        if (activeRenderer) {
+            try {
+                await stopRenderer(activeRenderer.udn);
+            } catch (e) { console.error('UPnP Stop error:', e); }
+        }
+        setIsCasting(false);
+        setActiveRenderer(null);
+        
+        // Resume locally if track exists
+        if (currentTrack && audioRef.current) {
+            audioRef.current.src = getStreamUrl(currentTrack.id);
+            audioRef.current.play().catch(() => {});
+            setIsPlaying(true);
+        }
+    }, [activeRenderer, currentTrack]);
 
     const setShuffle = useCallback((mode) => {
         setShuffleMode(mode);
@@ -143,7 +213,20 @@ export function usePlayer() {
         }
     }, [queue, currentTrack]);
 
-    const togglePlay = useCallback(() => {
+    const togglePlay = useCallback(async () => {
+        if (isCasting && activeRenderer) {
+            try {
+                if (isPlaying) {
+                    await pauseRenderer(activeRenderer.udn);
+                    setIsPlaying(false);
+                } else {
+                    await resumeRenderer(activeRenderer.udn);
+                    setIsPlaying(true);
+                }
+            } catch (err) { console.error('UPnP Toggle error:', err); }
+            return;
+        }
+
         const audio = audioRef.current;
         if (!audio || !currentTrack) return;
 
@@ -152,27 +235,45 @@ export function usePlayer() {
         } else {
             audio.play().catch(err => console.error('Playback error:', err));
         }
-    }, [isPlaying, currentTrack]);
+    }, [isPlaying, currentTrack, isCasting, activeRenderer]);
 
-    const seek = useCallback((time) => {
+    const seek = useCallback(async (time) => {
+        if (isCasting && activeRenderer) {
+            try {
+                await seekRenderer(activeRenderer.udn, time);
+                setCurrentTime(time);
+            } catch (e) { console.error('UPnP Seek error:', e); }
+            return;
+        }
+
         const audio = audioRef.current;
         if (audio) {
             audio.currentTime = time;
         }
-    }, []);
+    }, [isCasting, activeRenderer]);
 
-    const changeVolume = useCallback((vol) => {
+    const changeVolume = useCallback(async (vol) => {
+        if (isCasting && activeRenderer) {
+            try {
+                // Backend expects 0-100
+                await setRendererVolume(activeRenderer.udn, Math.round(vol * 100));
+                setVolume(vol);
+            } catch (e) { console.error('UPnP Volume error:', e); }
+            return;
+        }
+
         const audio = audioRef.current;
         if (audio) {
             audio.volume = vol;
             setVolume(vol);
         }
-    }, []);
+    }, [isCasting, activeRenderer]);
 
     return {
         currentTrack, isPlaying, currentTime, duration, volume,
         queue, currentIndex, repeatMode, shuffleMode,
-        playTrack, togglePlay, seek, changeVolume,
+        isCasting, activeRenderer, setIsCasting,
+        playTrack, togglePlay, seek, changeVolume, startCast, stopCast,
         next, prev, stop, setRepeatMode, setShuffle
     };
 }

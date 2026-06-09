@@ -12,58 +12,78 @@ _renderers: dict[str, dict] = {}
 
 async def discover_renderers(timeout: int = 5) -> list[dict]:
     """
-    Discover UPnP/DLNA media renderers on the local network.
-
-    Returns:
-        List of dicts with name, location, and udn.
+    Discover UPnP/DLNA media renderers on the local network with 
+    robust logging and timeout handling for production Docker.
     """
     global _renderers
     _renderers.clear()
+    
+    # Verbose Logging for UPnP library
+    import os
+    from async_upnp_client.search import async_search
+    from async_upnp_client.aiohttp import AiohttpRequester
+    from async_upnp_client.client_factory import UpnpFactory
+    import aiohttp
+
+    logging.getLogger('async_upnp_client').setLevel(logging.DEBUG)
+
+    # Use BIND_IP if provided (critical for Docker host mode)
+    bind_ip = os.environ.get("BIND_IP", "0.0.0.0")
+    logger.info(f"Starting UPnP Discovery: Timeout={timeout}s, Bind IP={bind_ip}")
+
+    requester = AiohttpRequester()
+    factory = UpnpFactory(requester)
+
+    search_targets = [
+        "urn:schemas-upnp-org:device:MediaRenderer:1",
+        "urn:schemas-upnp-org:device:MediaRenderer:2",
+        "ssdp:all"
+    ]
+
+    async def on_device_found(headers: dict):
+        location = headers.get("location", "")
+        if not location or location in [r["location"] for r in _renderers.values()]:
+            return
+
+        logger.debug(f"Found potential device at: {location}")
+        try:
+            # Use library's native, robust create_device with the pre-configured requester
+            device = await factory.async_create_device(location)
+            
+            is_renderer = (
+                "MediaRenderer" in (device.device_type or "") or
+                any("AVTransport" in s.service_type for s in device.services.values())
+            )
+
+            if is_renderer:
+                renderer = {
+                    "name": device.friendly_name or f"Renderer ({location})",
+                    "location": location,
+                    "udn": device.udn or location,
+                    "type": device.device_type
+                }
+                _renderers[renderer["udn"]] = renderer
+                logger.info(f"MATCH: {renderer['name']} confirmed via XML.")
+        except Exception as e:
+            # Explicitly log the error per device URL as requested
+            logger.error(f"UPnP XML Validation failed for {location}: {e}")
 
     try:
-        from async_upnp_client.search import async_search
-        from async_upnp_client.aiohttp import AiohttpRequester
-        from async_upnp_client.client_factory import UpnpFactory
-
-        requester = AiohttpRequester()
-        factory = UpnpFactory(requester)
-
-        devices = []
-
-        async def on_device_found(headers: dict):
-            """Callback when a UPnP device is found via SSDP."""
-            location = headers.get("location", "")
-            if not location:
-                return
-
+        # Search targets sequentially with simple, reliable parameters
+        for target in search_targets:
             try:
-                device = await factory.async_create_device(location)
-                # Check if it's a media renderer
-                if device.device_type and "MediaRenderer" in device.device_type:
-                    renderer = {
-                        "name": device.friendly_name or "Unknown Renderer",
-                        "location": location,
-                        "udn": device.udn or location,
-                    }
-                    _renderers[renderer["udn"]] = renderer
-                    devices.append(renderer)
+                await async_search(
+                    search_target=target,
+                    timeout=timeout,
+                    async_callback=on_device_found
+                )
             except Exception as e:
-                logger.debug(f"Could not create device from {location}: {e}")
-
-        # Search for media renderers
-        await async_search(
-            search_target="urn:schemas-upnp-org:device:MediaRenderer:1",
-            timeout=timeout,
-            async_callback=on_device_found,
-        )
+                logger.error(f"SSDP Broadcast for {target} failed: {e}")
 
         return list(_renderers.values())
 
-    except ImportError:
-        logger.warning("async-upnp-client not available, using fallback discovery")
-        return await _fallback_discover(timeout)
     except Exception as e:
-        logger.error(f"UPnP discovery error: {e}")
+        logger.error(f"Critical UPnP discovery error: {e}")
         return []
 
 
@@ -149,12 +169,22 @@ async def play_on_renderer(renderer_udn: str, media_url: str) -> bool:
         if not av_transport:
             raise RuntimeError("No AVTransport service found on renderer")
 
-        # Set the URI
+        import html
+        # Construct basic DIDL-Lite metadata for strict renderers
+        didl_metadata = f'''<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">
+    <item id="0" parentID="-1" restricted="1">
+        <dc:title>LexiTag Stream</dc:title>
+        <upnp:class>object.item.audioItem.musicTrack</upnp:class>
+        <res protocolInfo="http-get:*:audio/mpeg:*">{html.escape(media_url)}</res>
+    </item>
+</DIDL-Lite>'''
+
+        # Set the URI with metadata
         set_uri = av_transport.action("SetAVTransportURI")
         await set_uri.async_call(
             InstanceID=0,
             CurrentURI=media_url,
-            CurrentURIMetaData="",
+            CurrentURIMetaData=didl_metadata,
         )
 
         # Play
@@ -172,9 +202,44 @@ async def play_on_renderer(renderer_udn: str, media_url: str) -> bool:
 
 async def stop_renderer(renderer_udn: str) -> bool:
     """Stop playback on a UPnP renderer."""
+    return await _call_av_action(renderer_udn, "Stop", InstanceID=0)
+
+
+async def pause_renderer(renderer_udn: str) -> bool:
+    """Pause playback on a UPnP renderer."""
+    return await _call_av_action(renderer_udn, "Pause", InstanceID=0)
+
+
+async def resume_renderer(renderer_udn: str) -> bool:
+    """Resume playback on a UPnP renderer."""
+    return await _call_av_action(renderer_udn, "Play", InstanceID=0, Speed="1")
+
+
+async def seek_renderer(renderer_udn: str, seconds: float) -> bool:
+    """Seek to a specific time on a UPnP renderer."""
+    target = _format_time(seconds)
+    logger.info(f"Seeking on {renderer_udn} to {target} ({seconds}s)")
+    return await _call_av_action(
+        renderer_udn, 
+        "Seek", 
+        InstanceID=0, 
+        Unit="REL_TIME", 
+        Target=target
+    )
+
+
+def _format_time(seconds: float) -> str:
+    """Convert seconds to HH:MM:SS string."""
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+async def set_renderer_volume(renderer_udn: str, volume: int) -> bool:
+    """Set volume on a UPnP renderer (0-100)."""
     renderer = _renderers.get(renderer_udn)
-    if not renderer:
-        return False
+    if not renderer: return False
 
     try:
         from async_upnp_client.aiohttp import AiohttpRequester
@@ -184,17 +249,37 @@ async def stop_renderer(renderer_udn: str) -> bool:
         factory = UpnpFactory(requester)
         device = await factory.async_create_device(renderer["location"])
 
-        av_transport = None
-        for service in device.services.values():
-            if "AVTransport" in service.service_type:
-                av_transport = service
-                break
-
-        if av_transport:
-            stop_action = av_transport.action("Stop")
-            await stop_action.async_call(InstanceID=0)
+        # Volume is usually in RenderingControl
+        service = next((s for s in device.services.values() if "RenderingControl" in s.service_type), None)
+        if service:
+            action = service.action("SetVolume")
+            await action.async_call(InstanceID=0, Channel="Master", DesiredVolume=volume)
             return True
         return False
     except Exception as e:
-        logger.error(f"UPnP stop error: {e}")
+        logger.error(f"UPnP volume error: {e}")
+        return False
+
+
+async def _call_av_action(renderer_udn: str, action_name: str, **kwargs) -> bool:
+    """Helper to call an action on the AVTransport service."""
+    renderer = _renderers.get(renderer_udn)
+    if not renderer: return False
+
+    try:
+        from async_upnp_client.aiohttp import AiohttpRequester
+        from async_upnp_client.client_factory import UpnpFactory
+
+        requester = AiohttpRequester()
+        factory = UpnpFactory(requester)
+        device = await factory.async_create_device(renderer["location"])
+
+        service = next((s for s in device.services.values() if "AVTransport" in s.service_type), None)
+        if service:
+            action = service.action(action_name)
+            await action.async_call(**kwargs)
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"UPnP action {action_name} error: {e}")
         return False

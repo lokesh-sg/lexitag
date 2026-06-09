@@ -3,22 +3,25 @@
 import json
 import time
 import asyncio
-from ..database import get_db
+from backend.app.database import get_db
 from pathlib import Path
-from .scanner import scan_file
-from .lyrics import fetch_lyrics
-from .lyrics_llm import fetch_lyrics_llm
-from .tagger import write_tags
+from backend.app.services.scanner import scan_file
+from backend.app.services.lyrics import fetch_lyrics
+from backend.app.services.lyrics_llm import fetch_lyrics_llm
+from backend.app.services.tagger import write_tags
 
 
 STEPS = ["read", "backup", "sanitize", "lyrics", "language", "write"]
 
 
-async def fix_track(track_id: int, batch_id: str = None, progress_callback=None, clean_filenames: bool = False, lyrics_only: bool = False, local_only: bool = False, filenames_only: bool = False) -> dict:
+async def fix_track(track_id: int, batch_id: str = None, progress_callback=None, clean_filenames: bool = False, lyrics_only: bool = False, local_only: bool = False, filenames_only: bool = False, language_only: bool = False) -> dict:
     """
     Run the full Fixer pipeline on a single track with precision stage timing.
     """
-    if filenames_only:
+    if language_only:
+        local_only = True
+        clean_filenames = False
+    elif filenames_only:
         local_only = True
         clean_filenames = True
     db = await get_db()
@@ -101,7 +104,7 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
                 
                 all_text_tags[k] = val_str
         
-        from .local_cleaner import pre_clean_tags
+        from backend.app.services.local_cleaner import pre_clean_tags
         raw_before = dict(all_text_tags)
         pre_cleaned_tags = pre_clean_tags(all_text_tags)
         pre_cleaned_original = pre_clean_tags(original_tags)
@@ -127,7 +130,7 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
         if not lyrics_only and not local_only:
             # ── Step 3: SANITIZE ──
             await notify("sanitize", "running", "Performing forensic identification...")
-            from .master_llm import process_song_full
+            from backend.app.services.master_llm import process_song_full
             async def on_master_retry(wait_time):
                 await notify("sanitize", "waiting", f"Rate limited. Retrying in {int(wait_time)}s...")
 
@@ -169,14 +172,17 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
             cleaned_tags = {k: v for k, v in cleaned_result.items() if k.lower() not in {ik.lower() for ik in INTERNAL_KEYS}}
             await notify("sanitize", "done")
         else:
-            msg = "Fix filenames only" if filenames_only else ("Skipped in lyrics-only mode" if lyrics_only else "Local standardization only")
+            msg = "Language sync only" if language_only else ("Fix filenames only" if filenames_only else ("Skipped in lyrics-only mode" if lyrics_only else "Local standardization only"))
             await notify("sanitize", "done", msg)
-            cleaned_tags = pre_cleaned_tags
+            if language_only:
+                cleaned_tags = dict(all_text_tags) # Keep existing tags EXACTLY as they are
+            else:
+                cleaned_tags = pre_cleaned_tags
             
             # Local Suggested Filename Generator
             suggested_filename = None
             if clean_filenames:
-                from .tagger import _flatten_tag
+                from backend.app.services.tagger import _flatten_tag
                 # Prioritize cleaned tags if available, else original
                 title = cleaned_tags.get("title") or original_tags.get("title")
                 artist = cleaned_tags.get("artist") or original_tags.get("artist")
@@ -216,10 +222,24 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
             lyrics = original_tags.get("lyrics", "")
 
         # ── Step 5: LANGUAGE ──
-        await notify("language", "done")
-
         # ── Step 6: WRITE ──
         await notify("write", "running")
+        
+        # AGGRESSIVE RAW TAG JUNK PURGE
+        # By default, Mutagen only edits predefined human fields and leaves random custom fields untouched.
+        # This will deliberately locate custom raw fields with junk and pass `{ "field": "" }` to tagger.py
+        # which acts as an explicit DEL command.
+        from backend.app.services.scanner import _check_junk
+        raw_tags_to_purge = {}
+        if not language_only and not lyrics_only:
+            for k, val in raw_before.items():
+                k_str = str(k)
+                v_str = str(val[0]) if isinstance(val, list) and val else str(val)
+                # Keep standard frames out of this, they are handled natively.
+                if _check_junk(k_str) or _check_junk(v_str):
+                    if k_str.lower() not in ["title", "artist", "album", "genre", "year", "composer", "comment", "language"]:
+                        raw_tags_to_purge[k_str] = ""
+        
         final_path = track_path
         if clean_filenames and suggested_filename:
             try:
@@ -244,26 +264,35 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
                         await db.execute("UPDATE tracks SET path = ?, filename = ? WHERE id = ?", (final_path, Path(final_path).name, track_id))
                         await db.commit()
             except Exception as e:
-                print(f"[fixer] Rename failed: {e}")
+                print(f"[fixer] Rename failed for {track_path}: {e}")
 
-        # Filter and write
+        # Remove keys that shouldn't be passed to mutagen
         IGNORE_KEYS = {"has_junk", "has_lyrics", "last_scanned", "path", "filename", "duration", "suggested_filename", "current_filename", "parent_folder", "discovery_result", "research_context"}
         tags_to_write = {k: v for k, v in cleaned_tags.items() if k not in IGNORE_KEYS}
-        success = write_tags(final_path, tags_to_write, lyrics, language, raw_tags=tags_to_write)
-        if not success:
-            await notify("write", "error", "Failed to write tags")
-            return {"success": False, "error": "Write failed"}
+
+        # ONLY Write to file if it was actually fetched or we are applying local rules. Lyrics-only or local skip is respected.
+        if (llm_lyrics_found or not lyrics_only) or local_only:
+            success = write_tags(final_path, tags_to_write, lyrics, language, raw_tags=raw_tags_to_purge)
+            if not success:
+                await notify("write", "error", "File system error.")
+                return {"success": False, "error": "Write failed"}
+            
+            # Post-write native sync logic
+            if language:
+                from backend.app.services.tagger import append_language_genre, _get_full_lang
+                if full_lang := _get_full_lang(language):
+                    append_language_genre(final_path, full_lang)
 
         # Extract a fresh audit of raw tags from disk after the write 
         # to ensure the history diff is 100% accurate
-        from .scanner import fetch_raw_tags
+        from backend.app.services.scanner import fetch_raw_tags
         raw_after_audit = fetch_raw_tags(final_path)["tags"]
 
         duration = time.time() - start_time
         
         # We need to unify the cleaned_tags for the "summary" view in history
         # Since cleaned_tags may contain raw Mutagen keys (like TIT2)
-        from .local_cleaner import pre_clean_tags
+        from backend.app.services.local_cleaner import pre_clean_tags
         final_summary = scan_file(final_path) # Most reliable way to get unified fields
         
         changed_tags = {
@@ -290,7 +319,7 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
             f"""UPDATE tracks SET
                 title = ?, artist = ?, album = ?, genre = ?, year = ?, composer = ?,
                 has_lyrics = ?, lyrics = ?, language = ?, has_junk = 0, last_scanned = ?,
-                path = ?, filename = ?,
+                path = ?, filename = ?, raw_tags_json = ?,
                 {count_field} = {count_field} + 1, last_fix_type = ?,
                 last_fixed_at = ?, last_ai_fix_duration = ?
                WHERE id = ?""",
@@ -307,6 +336,7 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
                 time.strftime("%Y-%m-%d %H:%M:%S"),
                 final_path,
                 Path(final_path).name,
+                json.dumps(raw_after_audit),
                 fix_type,
                 time.strftime("%Y-%m-%d %H:%M:%S"),
                 duration,
@@ -338,6 +368,6 @@ async def revert_track(history_id: int) -> dict:
     await db.execute("UPDATE tag_history SET reverted = 1 WHERE id = ?", (history_id,))
     file_data = scan_file(track_path)
     if file_data:
-        await db.execute("UPDATE tracks SET title = ?, artist = ?, album = ?, genre = ?, year = ?, composer = ?, has_lyrics = ?, language = '', has_junk = ?, last_scanned = ? WHERE path = ?", (file_data["title"], file_data["artist"], file_data["album"], file_data["genre"], file_data["year"], file_data["composer"], 1 if file_data["has_lyrics"] else 0, 1 if file_data["has_junk"] else 0, file_data["last_scanned"], track_path))
+        await db.execute("UPDATE tracks SET title = ?, artist = ?, album = ?, genre = ?, year = ?, composer = ?, has_lyrics = ?, language = '', has_junk = ?, raw_tags_json = ?, last_scanned = ? WHERE path = ?", (file_data["title"], file_data["artist"], file_data["album"], file_data["genre"], file_data["year"], file_data["composer"], 1 if file_data["has_lyrics"] else 0, 1 if file_data["has_junk"] else 0, file_data.get("raw_tags_json", "{}"), file_data["last_scanned"], track_path))
     await db.commit()
     return {"success": True, "message": "Reverted"}

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { fetchRenderers, castToRenderer } from '../api';
+import { fetchRenderers } from '../api';
+import { usePlayerContext } from '../contexts/AppContext';
 
 export default function CastModal({ trackId, onClose }) {
+  const player = usePlayerContext();
   const [renderers, setRenderers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [casting, setCasting] = useState(null);
@@ -20,7 +22,12 @@ export default function CastModal({ trackId, onClose }) {
   async function handleCast(r) {
     setCasting(r.udn);
     setError('');
-    try { await castToRenderer(r.udn, trackId); onClose(); }
+    try { 
+        if (player.startCast) {
+            await player.startCast(r);
+        }
+        onClose(); 
+    }
     catch { setError(`Failed to cast to ${r.name}`); }
     finally { setCasting(null); }
   }

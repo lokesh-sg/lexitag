@@ -142,6 +142,43 @@ export default function Dashboard() {
     setModalTracks(selectedTracks);
   };
 
+  const handleSyncLanguage = () => {
+    if (selected.size === 0) return;
+    const isAdding = fixer.isFixing;
+    setModal({
+      type: 'confirm',
+      title: isAdding ? 'Add to Current Queue' : 'Sync Language to Genre',
+      message: isAdding 
+        ? `You already have an active fix job. These ${selected.size} track(s) will be added to the queue.`
+        : `Are you sure you want to sync the language to the genre field for ${selected.size} track(s)? This will keep existing tags exactly as they are.`,
+      onConfirm: async () => {
+        setModal(null);
+        try {
+          await fixer.fix(Array.from(selected), { language_only: true }, tracks.reload);
+          setSelected(new Set());
+        } catch (e) {}
+      }
+    });
+  };
+
+  const handleSyncLanguageAll = () => {
+    const isAdding = fixer.isFixing;
+    setModal({
+      type: 'confirm',
+      title: isAdding ? 'Add to Current Queue' : 'Sync Entire Library Language',
+      message: isAdding 
+        ? `You already have an active fix job. The entire library will be added to the queue.`
+        : `Are you sure you want to run a global language sync across your ENTIRE library (${tracks.total} tracks)? This bypasses LLM and standard local formatting and strictly injects the stored language to the genre tags.`,
+      onConfirm: async () => {
+        setModal(null);
+        try {
+          await fixer.fix([], { language_only: true, all_tracks: true }, tracks.reload);
+          setSelected(new Set());
+        } catch (e) {}
+      }
+    });
+  };
+
   return (
     <div className="space-y-5 animate-fade-in relative">
       {/* Scan Progress Overlay */}
@@ -296,6 +333,38 @@ export default function Dashboard() {
                     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                   </svg>
                   <span>Fix Names {selected.size > 0 ? selected.size : ''}</span>
+                </div>
+              </button>
+              <button
+                onClick={handleSyncLanguage}
+                disabled={selected.size === 0}
+                className="btn-secondary !px-3 disabled:opacity-50"
+                title="Append Language to Genre for Selected"
+              >
+                <div className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7v4a1 1 0 001 1h3" />
+                    <path d="M21 17v-4a1 1 0 00-1-1h-3" />
+                    <path d="M21 3v6h-6" />
+                    <path d="M3 21v-6h6" />
+                    <path d="M16 3l-4 4-4-4" />
+                    <path d="M8 21l4-4 4 4" />
+                  </svg>
+                  <span>Sync Lang {selected.size > 0 ? selected.size : ''}</span>
+                </div>
+              </button>
+              <button
+                onClick={handleSyncLanguageAll}
+                className="btn-secondary !px-3 text-emerald-500 hover:text-emerald-400 border-emerald-500/30 hover:border-emerald-500/60 transition-colors"
+                title="Global Library Sync Language to Genre"
+              >
+                <div className="flex items-center gap-1.5 font-bold">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M2 12h20" />
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                  <span>All Lang</span>
                 </div>
               </button>
               <button

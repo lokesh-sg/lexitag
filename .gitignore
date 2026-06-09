@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.venv/
+venv/
+
+# Node
+node_modules/
+dev/frontend/dist/
+frontend/dist/
+
+# Environment — never commit secrets
+.env
+*.env.local
+
+# Databases and logs — generated at runtime
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.log.*
+
+# Data directory — contains live database and runtime logs
+data/
+dev/data/
+
+# Build archives
+builds/*.zip
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# macOS Finder clutter
+*.textClipping
+
+# Debug files and backups
+*.tar
+*.tar.*
+.master.key
+.!*
+*.bak
+*.mp3
+*.flac
+*.wav
+*.db.old*
+backend.log
+.agents/
+dev/

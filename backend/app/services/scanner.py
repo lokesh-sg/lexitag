@@ -11,43 +11,21 @@ from mutagen.mp4 import MP4
 
 SUPPORTED_EXTENSIONS = {".mp3", ".flac", ".m4a", ".mp4", ".ogg", ".opus", ".wma", ".aac", ".wav"}
 
-# Patterns that indicate junk metadata
-JUNK_PATTERNS = [
-    re.compile(r'https?://\S+', re.IGNORECASE),
-    re.compile(r'www\.\S+', re.IGNORECASE),
-    re.compile(r'\.(com|net|org|io|info|online|site|top|club|audio|music|gold|download|link|me|biz|tv|xyz|life|best|today|work|site)\b', re.IGNORECASE),
-    re.compile(r'downloaded?\s+from', re.IGNORECASE),
-    re.compile(r'ripped\s+by', re.IGNORECASE),
-    re.compile(r'uploaded?\s+by', re.IGNORECASE),
-    re.compile(r'provided\s+by', re.IGNORECASE),
-    re.compile(r'encoded\s+by', re.IGNORECASE),
-    re.compile(r'tags?\s+by', re.IGNORECASE),
-    re.compile(r'visit\s+(us\s+at\s+)?', re.IGNORECASE),
-    re.compile(r'free\s+download', re.IGNORECASE),
-    re.compile(r'official\s+site', re.IGNORECASE),
-    re.compile(r'exclusive\s+on', re.IGNORECASE),
-    re.compile(r'quality\s+assured', re.IGNORECASE),
-    re.compile(r'join\s+us', re.IGNORECASE),
-    re.compile(r'subscribe', re.IGNORECASE),
-    re.compile(r'promo(tional)?', re.IGNORECASE),
-    re.compile(r'sponsor(ed|ship)?', re.IGNORECASE),
-    re.compile(r'advertising|marketing', re.IGNORECASE),
-    re.compile(r'follow\s+(us|me)\s+(on|at)', re.IGNORECASE),
-    re.compile(r'TamilVaathi|Masstamilan|Starmusiq|Isaimini|Tamilyogi|Samperals|Raag|Gaana|Saavn|Naasongs|Sensongsmp3', re.IGNORECASE),
-]
-
-
-
+# Legacy static patterns removed - System is now 100% data-driven via clean_rules in DB
+JUNK_PATTERNS = []
 
 def _check_junk(text: str) -> bool:
     """Return True if text matches any junk pattern."""
     if not text:
         return False
-    # Specific aggressive check for known promo signatures
-    low_text = text.lower()
-    if "tamilvaathi" in low_text or "tamilvaathi.online" in low_text:
+    
+    from backend.app.services.local_cleaner import get_junk_regex, _placeholder_regex
+    
+    # 1. Check against primary junk regex (Promos, URLs from DB)
+    if get_junk_regex().search(text):
         return True
-    return any(p.search(text) for p in JUNK_PATTERNS)
+    
+    return False
 
 
 def _get_id3_tags(audio) -> dict:
@@ -72,31 +50,36 @@ def _get_id3_tags(audio) -> dict:
     else:
         return tags
 
+    def _clean_frame(frame):
+        if hasattr(frame, 'text'):
+            return "; ".join([str(t) for t in frame.text]) if isinstance(frame.text, list) else str(frame.text)
+        return str(frame).replace('\x00', '; ')
+
     # Title
     if "TIT2" in id3:
-        tags["title"] = str(id3["TIT2"])
+        tags["title"] = _clean_frame(id3["TIT2"])
     # Artist
     if "TPE1" in id3:
-        tags["artist"] = str(id3["TPE1"])
+        tags["artist"] = _clean_frame(id3["TPE1"])
     # Album
     if "TALB" in id3:
-        tags["album"] = str(id3["TALB"])
+        tags["album"] = _clean_frame(id3["TALB"])
     # Genre
     if "TCON" in id3:
-        tags["genre"] = str(id3["TCON"])
+        tags["genre"] = _clean_frame(id3["TCON"])
     # Year
     if "TDRC" in id3:
-        tags["year"] = str(id3["TDRC"])
+        tags["year"] = _clean_frame(id3["TDRC"])
     elif "TYER" in id3:
-        tags["year"] = str(id3["TYER"])
+        tags["year"] = _clean_frame(id3["TYER"])
     # Composer
     if "TCOM" in id3:
-        tags["composer"] = str(id3["TCOM"])
+        tags["composer"] = _clean_frame(id3["TCOM"])
     # Language
     if "TXXX:Language" in id3:
-        tags["language"] = str(id3["TXXX:Language"])
+        tags["language"] = _clean_frame(id3["TXXX:Language"])
     elif "TLAN" in id3:
-        tags["language"] = str(id3["TLAN"])
+        tags["language"] = _clean_frame(id3["TLAN"])
     # Lyrics (USLT frames)
     # Check all USLT frames; prioritize those with content
     for key in id3:
@@ -151,24 +134,29 @@ def _get_flac_tags(audio: FLAC) -> dict:
         return tags
 
     vorbis = audio.tags
-    tags["title"] = vorbis.get("title", [""])[0]
-    tags["artist"] = vorbis.get("artist", [""])[0]
-    tags["album"] = vorbis.get("album", [""])[0]
-    tags["genre"] = vorbis.get("genre", [""])[0]
-    tags["year"] = vorbis.get("date", [""])[0]
+    
+    def _safe_get(k):
+        val = vorbis.get(k)
+        return val[0] if val and isinstance(val, list) and len(val) > 0 else ""
+
+    tags["title"] = _safe_get("title")
+    tags["artist"] = _safe_get("artist")
+    tags["album"] = _safe_get("album")
+    tags["genre"] = _safe_get("genre")
+    tags["year"] = _safe_get("date")
     
     # Lyrics: check common FLAC/Vorbis lyrics keys
     for k in ["lyrics", "unsyncedlyrics", "lyric", "unsynced lyrics"]:
-        val = vorbis.get(k, [""])[0]
+        val = _safe_get(k)
         if val.strip():
             tags["lyrics"] = val
             break
             
-    tags["comment"] = vorbis.get("comment", [""])[0]
-    tags["composer"] = vorbis.get("composer", [""])[0]
+    tags["comment"] = _safe_get("comment")
+    tags["composer"] = _safe_get("composer")
     # Language: Prioritize full name if available
-    lang_val = vorbis.get("language", [""])[0]
-    full_lang = vorbis.get("language_full", [""])[0]
+    lang_val = _safe_get("language")
+    full_lang = _safe_get("language_full")
     tags["language"] = full_lang if full_lang and len(full_lang) > 3 else lang_val
 
     return tags
@@ -190,25 +178,30 @@ def _get_mp4_tags(audio: MP4) -> dict:
     if audio.tags is None:
         return tags
 
-    t = audio.tags
-    tags["title"] = t.get("\xa9nam", [""])[0]
-    tags["artist"] = t.get("\xa9ART", [""])[0]
-    tags["album"] = t.get("\xa9alb", [""])[0]
-    tags["genre"] = t.get("\xa9gen", [""])[0]
-    tags["year"] = t.get("\xa9day", [""])[0]
+    atoms = audio.tags
+    
+    def _safe_get(k):
+        val = atoms.get(k)
+        return str(val[0]) if val and isinstance(val, list) and len(val) > 0 else ""
+
+    tags["title"] = _safe_get("\xa9nam")
+    tags["artist"] = _safe_get("\xa9ART")
+    tags["album"] = _safe_get("\xa9alb")
+    tags["genre"] = _safe_get("\xa9gen")
+    tags["year"] = _safe_get("\xa9day")
     
     # Lyrics: check common MP4 lyrics keys
     for k in ["\xa9lyr", "lyrics", "desc"]:
-        val = t.get(k, [""])[0]
-        if isinstance(val, str) and val.strip():
+        val = _safe_get(k)
+        if val.strip():
             tags["lyrics"] = val
             break
             
-    tags["comment"] = t.get("\xa9cmt", [""])[0]
-    tags["composer"] = t.get("\xa9wrt", [""])[0]
+    tags["comment"] = _safe_get("\xa9cmt")
+    tags["composer"] = _safe_get("\xa9wrt")
     # Language: Prioritize full name in freeform atom if available
-    lang_val = t.get("\xa9lan", [""])[0]
-    full_lang_raw = t.get("----:com.apple.iTunes:Language", [b""])[0]
+    lang_val = _safe_get("\xa9lan")
+    full_lang_raw = atoms.get("----:com.apple.iTunes:Language", [b""])[0]
     full_lang = full_lang_raw.decode('utf-8', errors='ignore') if isinstance(full_lang_raw, bytes) else str(full_lang_raw)
     tags["language"] = full_lang if full_lang and len(full_lang) > 3 else lang_val
 
@@ -299,20 +292,23 @@ def scan_file(filepath: str) -> dict | None:
                 try:
                     for key, val in tags_obj.items():
                         k = key.lower()
+                        # Handle multi-value tags by joining with "; "
+                        val_str = "; ".join(val) if isinstance(val, list) else str(val)
+                        
                         if "title" in k:
-                            tags["title"] = str(val[0]) if isinstance(val, list) else str(val)
+                            tags["title"] = val_str
                         elif "artist" in k:
-                            tags["artist"] = str(val[0]) if isinstance(val, list) else str(val)
+                            tags["artist"] = val_str
                         elif "album" in k:
-                            tags["album"] = str(val[0]) if isinstance(val, list) else str(val)
+                            tags["album"] = val_str
                         elif "genre" in k:
-                            tags["genre"] = str(val[0]) if isinstance(val, list) else str(val)
+                            tags["genre"] = val_str
                         elif "date" in k or "year" in k:
-                            tags["year"] = str(val[0]) if isinstance(val, list) else str(val)
+                            tags["year"] = val_str
                         elif "composer" in k:
-                            tags["composer"] = str(val[0]) if isinstance(val, list) else str(val)
+                            tags["composer"] = val_str
                         elif "lyrics" in k:
-                            tags["lyrics"] = str(val[0]) if isinstance(val, list) else str(val)
+                            tags["lyrics"] = val_str
                         elif "comment" in k:
                             tags["comment"] = str(val[0]) if isinstance(val, list) else str(val)
                 except Exception:
@@ -344,6 +340,19 @@ def scan_file(filepath: str) -> dict | None:
                         break
                 except Exception as e:
                     print(f"[scanner] Error checking frame {key}: {e}")
+            
+            # Additional check for RIFF INFO in WAV files
+            if fmt == "wav":
+                try:
+                    import mutagen.riff
+                    info = mutagen.riff.INFO(filepath)
+                    for rk, rv in info.items():
+                        rv_str = str(rv[0]) if isinstance(rv, list) and rv else str(rv)
+                        if _check_junk(rk) or _check_junk(rv_str):
+                            print(f"[scanner] JUNK FOUND in RIFF INFO frame {rk}: {rv_str}")
+                            has_junk = True
+                            break
+                except Exception: pass
 
         if not has_junk:
             # Final check on extracted standard tags just in case
@@ -357,8 +366,8 @@ def scan_file(filepath: str) -> dict | None:
         bitrate = getattr(info, "bitrate", 0) // 1000 if info else 0
 
         # Apply local cleaning immediately during scan
-        from .local_cleaner import pre_clean_tags
-        from .discovery_engine import discovery_engine
+        from backend.app.services.local_cleaner import pre_clean_tags
+        from backend.app.services.discovery_engine import discovery_engine
         
         raw_scanned = {
             "title": tags.get("title", ""),
@@ -376,15 +385,19 @@ def scan_file(filepath: str) -> dict | None:
         
         cleaned = pre_clean_tags(raw_scanned)
 
+        raw_fetched = fetch_raw_tags(filepath)
+        import json
+        raw_tags_json = json.dumps(raw_fetched.get("tags", {}))
+
         return {
             "path": filepath,
             "filename": os.path.basename(filepath),
-            "title": cleaned["title"],
-            "artist": cleaned["artist"],
-            "album": cleaned["album"],
-            "genre": cleaned["genre"],
-            "year": cleaned["year"],
-            "composer": cleaned["composer"],
+            "title": raw_scanned["title"],
+            "artist": raw_scanned["artist"],
+            "album": raw_scanned["album"],
+            "genre": raw_scanned["genre"],
+            "year": raw_scanned["year"],
+            "composer": raw_scanned["composer"],
             "duration": round(duration, 2),
             "bitrate": bitrate,
             "has_lyrics": bool(tags.get("lyrics", "").strip()),
@@ -392,7 +405,8 @@ def scan_file(filepath: str) -> dict | None:
             "has_junk": has_junk,
             "format": fmt,
             "lyrics": tags.get("lyrics", ""),
-            "comment": cleaned["comment"],
+            "comment": raw_scanned["comment"],
+            "raw_tags_json": raw_tags_json,
             "last_scanned": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
     except Exception as e:
@@ -415,10 +429,15 @@ def fetch_raw_tags(filepath: str) -> dict:
                 if key.startswith("APIC") or key == "covr":
                     raw_tags[str(key)] = "__ALBUM_ART__"
                     continue
-                if isinstance(val, list):
+                if hasattr(val, 'text'):
+                    if isinstance(val.text, list):
+                        raw_tags[str(key)] = [str(v) for v in val.text]
+                    else:
+                        raw_tags[str(key)] = str(val.text)
+                elif isinstance(val, list):
                     raw_tags[str(key)] = [str(v) for v in val]
                 else:
-                    raw_tags[str(key)] = str(val)
+                    raw_tags[str(key)] = str(val).replace('\x00', '; ')
                     
         return {
             "tags": raw_tags,
@@ -434,7 +453,17 @@ def scan_directory(music_dirs_str: str):
     Yields (current_index, total_files, track_data) for each file.
     """
     # Split the string by newlines and filter out empty paths
-    directories = [d.strip() for d in music_dirs_str.split('\n') if d.strip() and os.path.isdir(d.strip())]
+    # Normalize paths: absolute, stripped, no trailing slash
+    raw_dirs = [os.path.abspath(d.strip()).rstrip(os.path.sep) 
+                for d in music_dirs_str.split('\n') 
+                if d.strip() and os.path.isdir(d.strip())]
+    
+    # Remove duplicates and overlapping paths (e.g., /A and /A/B)
+    raw_dirs = sorted(list(set(raw_dirs)))
+    directories = []
+    for d in raw_dirs:
+        if not any(d.startswith(parent + os.path.sep) for parent in directories):
+            directories.append(d)
     
     # 1. First pass: count total supported files
     all_files = []
@@ -444,6 +473,9 @@ def scan_directory(music_dirs_str: str):
                 if Path(fname).suffix.lower() in SUPPORTED_EXTENSIONS:
                     all_files.append(os.path.join(root, fname))
     
+    # 2. De-duplicate files list as absolute paths (safeguard)
+    all_files = sorted(list(set(all_files)))
+    
     total = len(all_files)
     if total == 0:
         return
@@ -452,4 +484,3 @@ def scan_directory(music_dirs_str: str):
     for i, fpath in enumerate(all_files):
         data = scan_file(fpath)
         yield (i + 1, total, data)
-

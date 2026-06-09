@@ -4,14 +4,14 @@ import os
 import mimetypes
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse, Response
-from ..database import get_db
-from ..models import UPnPRenderer, CastRequest, MessageResponse
-from ..services import upnp
+from backend.app.database import get_db
+from backend.app.models import UPnPRenderer, CastRequest, MessageResponse
+from backend.app.services import upnp
 
 router = APIRouter(prefix="/api/player", tags=["player"])
 
 
-@router.get("/stream/{track_id}")
+@router.api_route("/stream/{track_id}", methods=["GET", "HEAD"])
 async def stream_audio(track_id: int, request: Request):
     """Stream an audio file with range request support."""
     db = await get_db()
@@ -71,6 +71,33 @@ async def upnp_play(cast: CastRequest, request: Request):
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.post("/upnp/pause", response_model=MessageResponse)
+async def upnp_pause(renderer_udn: str):
+    """Pause playback on a UPnP renderer."""
+    success = await upnp.pause_renderer(renderer_udn)
+    if success:
+        return MessageResponse(message="Playback paused", success=True)
+    raise HTTPException(status_code=500, detail="Failed to pause playback")
+
+
+@router.post("/upnp/resume", response_model=MessageResponse)
+async def upnp_resume(renderer_udn: str):
+    """Resume playback on a UPnP renderer."""
+    success = await upnp.resume_renderer(renderer_udn)
+    if success:
+        return MessageResponse(message="Playback resumed", success=True)
+    raise HTTPException(status_code=500, detail="Failed to resume playback")
+
+
+@router.post("/upnp/volume", response_model=MessageResponse)
+async def upnp_volume(renderer_udn: str, volume: int):
+    """Set volume on a UPnP renderer (0-100)."""
+    success = await upnp.set_renderer_volume(renderer_udn, volume)
+    if success:
+        return MessageResponse(message=f"Volume set to {volume}", success=True)
+    raise HTTPException(status_code=500, detail="Failed to set volume")
+
+
 @router.post("/upnp/stop", response_model=MessageResponse)
 async def upnp_stop(renderer_udn: str):
     """Stop playback on a UPnP renderer."""
@@ -78,3 +105,12 @@ async def upnp_stop(renderer_udn: str):
     if success:
         return MessageResponse(message="Playback stopped", success=True)
     raise HTTPException(status_code=500, detail="Failed to stop playback")
+
+
+@router.post("/upnp/seek", response_model=MessageResponse)
+async def upnp_seek(renderer_udn: str, seconds: float):
+    """Seek to a specific time on a UPnP renderer."""
+    success = await upnp.seek_renderer(renderer_udn, seconds)
+    if success:
+        return MessageResponse(message=f"Seeked to {seconds}s", success=True)
+    raise HTTPException(status_code=500, detail="Failed to seek")

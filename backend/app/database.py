@@ -2,7 +2,7 @@
 
 import aiosqlite
 import os
-from .config import settings
+from backend.app.config import settings
 
 _db: aiosqlite.Connection | None = None
 
@@ -116,12 +116,14 @@ async def _run_migrations(db: aiosqlite.Connection):
     await _safe_add_column(db, "tracks", "composer", "TEXT DEFAULT ''")
     await _safe_add_column(db, "tracks", "comment", "TEXT DEFAULT ''")
     await _safe_add_column(db, "tracks", "lyrics", "TEXT DEFAULT ''")
+    await _safe_add_column(db, "tracks", "raw_tags_json", "TEXT DEFAULT '{}'")
     await _safe_add_column(db, "tracks", "local_fix_count", "INTEGER DEFAULT 0")
     await _safe_add_column(db, "tracks", "llm_fix_count", "INTEGER DEFAULT 0")
     await _safe_add_column(db, "tracks", "last_fix_type", "TEXT DEFAULT NULL")
     await _safe_add_column(db, "tracks", "last_fixed_at", "TEXT DEFAULT NULL")
     await _safe_add_column(db, "tracks", "last_ai_fix_duration", "REAL DEFAULT 0")
     await _safe_add_column(db, "tracks", "bitrate", "INTEGER DEFAULT 0")
+    await _safe_add_column(db, "tracks", "is_missing", "INTEGER DEFAULT 0")
 
     await _safe_add_column(db, "tag_history", "duration_seconds", "REAL DEFAULT 0")
 
@@ -168,7 +170,7 @@ async def _run_migrations(db: aiosqlite.Connection):
         now = time.strftime("%Y-%m-%d %H:%M:%S")
         
         # Pull standard patterns from local_cleaner (just the textual parts if possible)
-        from .services.local_cleaner import JUNK_PATTERNS
+        from backend.app.services.local_cleaner import JUNK_PATTERNS
         for p in JUNK_PATTERNS:
             # We insert as regex if it contains special chars
             is_reg = 1 if any(c in p for c in "()[]*+?|") else 0

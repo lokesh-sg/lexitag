@@ -170,9 +170,37 @@ export async function castToRenderer(rendererUdn, trackId) {
     return data;
 }
 
+export async function pauseRenderer(rendererUdn) {
+    const { data } = await api.post('/player/upnp/pause', null, {
+        params: { renderer_udn: rendererUdn },
+    });
+    return data;
+}
+
+export async function resumeRenderer(rendererUdn) {
+    const { data } = await api.post('/player/upnp/resume', null, {
+        params: { renderer_udn: rendererUdn },
+    });
+    return data;
+}
+
+export async function setRendererVolume(rendererUdn, volume) {
+    const { data } = await api.post('/player/upnp/volume', null, {
+        params: { renderer_udn: rendererUdn, volume: volume },
+    });
+    return data;
+}
+
 export async function stopRenderer(rendererUdn) {
     const { data } = await api.post('/player/upnp/stop', null, {
         params: { renderer_udn: rendererUdn },
+    });
+    return data;
+}
+
+export async function seekRenderer(rendererUdn, seconds) {
+    const { data } = await api.post('/player/upnp/seek', null, {
+        params: { renderer_udn: rendererUdn, seconds: seconds },
     });
     return data;
 }
@@ -206,6 +234,14 @@ export async function updateLibrarySource(id, updates) {
 
 export async function deleteLibrarySource(id) {
     const { data } = await api.delete(`/settings/sources/${id}`);
+    return data;
+}
+
+export async function relocateLibrary(oldBasePath, newBasePath) {
+    const { data } = await api.post('/settings/sources/relocate', { 
+        old_base_path: oldBasePath, 
+        new_base_path: newBasePath 
+    });
     return data;
 }
 

@@ -1,6 +1,6 @@
 """Language detection service — uses LLM to deduce ISO 639-1 language code."""
 
-from .llm import chat_completion
+from backend.app.services.llm import chat_completion
 
 SYSTEM_PROMPT = (
     "You are a language identification expert. Based on the provided song metadata "

@@ -1,5 +1,5 @@
 import re
-from .llm import chat_completion
+from backend.app.services.llm import chat_completion
 
 SYSTEM_PROMPT = (
     "You are a professional lyrics retrieval assistant. \n"

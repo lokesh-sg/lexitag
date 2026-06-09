@@ -76,10 +76,12 @@ class TagHistoryList(BaseModel):
 
 class FixRequest(BaseModel):
     track_ids: list[int]
+    all_tracks: bool = False
     clean_filenames: bool = False
     lyrics_only: bool = False
     local_only: bool = False
     filenames_only: bool = False
+    language_only: bool = False
     job_id: Optional[str] = None
 
 

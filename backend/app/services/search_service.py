@@ -25,7 +25,7 @@ async def _search_ddg(query: str, limit: int) -> str:
 
 async def _search_google_cse(query: str, limit: int) -> str:
     """Google Custom Search JSON API fallback (requires GOOGLE_CSE_KEY + GOOGLE_CSE_CX env vars)."""
-    from ..config import settings
+    from backend.app.config import settings
     api_key = settings.GOOGLE_CSE_KEY
     cx = settings.GOOGLE_CSE_CX
 

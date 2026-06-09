@@ -13,6 +13,7 @@ import {
   createLibrarySource,
   updateLibrarySource,
   deleteLibrarySource,
+  relocateLibrary,
   fetchCleanupPatterns,
   addCleanupPattern,
   deleteCleanupPattern,
@@ -25,6 +26,8 @@ export default function SettingsPanel({ visible, onClose }) {
   const [activeTab, setActiveTab] = useState('providers');
   const [sources, setSources] = useState([]);
   const [newSourcePath, setNewSourcePath] = useState('');
+  const [relocateForm, setRelocateForm] = useState({ old: '', new: '' });
+  const [relocateResult, setRelocateResult] = useState(null);
   const [providers, setProviders] = useState([]);
   const [presets, setPresets] = useState({});
   const [quota, setQuota] = useState(null);
@@ -112,6 +115,30 @@ export default function SettingsPanel({ visible, onClose }) {
       setError('Failed to delete source');
     }
   };
+
+    const handleRelocate = async () => {
+    if (!relocateForm.old || !relocateForm.new) return;
+    setSaving(true);
+    setRelocateResult(null);
+    setFormError(null);
+    try {
+      const res = await relocateLibrary(relocateForm.old, relocateForm.new);
+      setRelocateResult(res);
+      setRelocateForm({ old: '', new: '' });
+      loadAll();
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Relocation failed';
+      setFormError(Array.isArray(msg) ? msg[0].msg : msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const detectedBases = [...new Set(sources.map(s => {
+    const parts = s.path.split('/');
+    if (parts.length > 3) return parts.slice(0, 4).join('/');
+    return s.path;
+  }))];
 
   const handleAddCleanupPattern = async () => {
     if (!newPattern.pattern.trim()) return;
@@ -346,6 +373,109 @@ export default function SettingsPanel({ visible, onClose }) {
                 Enabled sources will be visible in the Library and History. <br/>
                 Disabling a source hides its tracks without deleting any data.
               </p>
+
+              {/* Path Relocation Section — The Migration Matrix */}
+              <div className="mt-8 pt-6 border-t border-surface-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col">
+                    <label className="block text-[11px] font-bold text-ink-muted uppercase tracking-wider">Library Migration Matrix</label>
+                    <span className="text-[9px] text-ink-faint uppercase font-bold mt-0.5">Move tracks between MacOS, Linux & Docker</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                     <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest">Universal Healer</span>
+                  </div>
+                </div>
+                
+                <div className="p-4 rounded-xl bg-surface-2 border border-surface-4 space-y-5 shadow-inner">
+                  <div className="space-y-3">
+                    <label className="block text-[9px] text-ink-faint uppercase font-bold italic">Detected Source Bases (Click to use)</label>
+                    <div className="flex flex-wrap gap-2">
+                       {detectedBases.map(base => (
+                         <div 
+                           key={base}
+                           onClick={() => setRelocateForm({...relocateForm, old: base})}
+                           className="px-2.5 py-1.5 rounded-lg bg-surface-0 border border-surface-4 text-[10px] font-mono text-ink-normal hover:border-amber-400/50 hover:bg-surface-1 cursor-pointer transition-all flex items-center gap-2 group"
+                         >
+                           <svg className="w-3 h-3 text-ink-faint group-hover:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                           {base}
+                         </div>
+                       ))}
+                       {detectedBases.length === 0 && <span className="text-[10px] text-ink-faint italic font-medium">No sources configured yet.</span>}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] text-ink-muted font-bold uppercase tracking-tighter">Current Base Path</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. /Volumes/Media/Music"
+                        value={relocateForm.old}
+                        onChange={e => setRelocateForm({...relocateForm, old: e.target.value})}
+                        className="w-full px-3 py-2.5 rounded-lg bg-surface-0 border border-surface-4 text-xs font-mono text-ink-rich focus:border-amber-400/50 hover:border-surface-6 outline-none shadow-sm transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] text-ink-muted font-bold uppercase tracking-tighter">New Base Path (Container)</label>
+                      <input 
+                        type="text" 
+                        placeholder="/app/music"
+                        value={relocateForm.new}
+                        onChange={e => setRelocateForm({...relocateForm, new: e.target.value})}
+                        className="w-full px-3 py-2.5 rounded-lg bg-surface-0 border border-surface-4 text-xs font-mono text-ink-rich focus:border-amber-400/50 hover:border-surface-6 outline-none shadow-sm transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {relocateResult && (
+                    <div className="p-4 rounded-xl bg-fn-success/5 border border-fn-success/20 text-xs text-fn-success space-y-2 animate-scale-in">
+                      <div className="flex items-center gap-2 font-black uppercase tracking-widest text-[10px]">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                        Migration Successful
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-[10px] font-bold">
+                        <div className="p-2 rounded bg-fn-success/10 border border-fn-success/20">
+                           <div className="text-fn-success/60 uppercase text-[9px]">Tracks Fixed</div>
+                           <div className="text-lg">{relocateResult.tracks_updated}</div>
+                        </div>
+                        <div className="p-2 rounded bg-fn-success/10 border border-fn-success/20">
+                           <div className="text-fn-success/60 uppercase text-[9px]">History Linked</div>
+                           <div className="text-lg">{relocateResult.history_updated}</div>
+                        </div>
+                      </div>
+                      <div className="text-[10px] font-bold text-fn-success/80 bg-fn-success/5 p-2 rounded border border-fn-success/10 flex items-center justify-between">
+                         <span>Sample Match Integrity:</span>
+                         <span className="text-sm">{relocateResult.sample_match_percentage}%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {formError && activeTab === 'system' && !relocateResult && (
+                    <div className="p-3 rounded-lg bg-fn-danger/10 border border-fn-danger/20 text-[10px] text-fn-danger font-bold flex items-center gap-2 animate-shake">
+                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                       {formError}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-3">
+                    <p className="text-[9px] text-ink-faint leading-relaxed italic border-l-2 border-surface-4 pl-3 py-1">
+                      <span className="text-amber-400 font-black uppercase mr-1">Pro Tip:</span>
+                      Relocation updates purely the <strong>Metadata Mapping</strong>. 
+                      Once relocated, your existing history snapshot will perfectly match your new files under the new path automatically.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                       <button 
+                        onClick={handleRelocate}
+                        disabled={saving || !relocateForm.old || !relocateForm.new}
+                        className="btn-primary !py-2 !px-8 text-[11px] font-black uppercase tracking-widest shadow-lg shadow-amber-400/20 active:translate-y-0.5 transition-all"
+                      >
+                        {saving ? 'Engaging Matrix...' : 'Relocate Library'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -661,7 +791,7 @@ export default function SettingsPanel({ visible, onClose }) {
                                   className="flex-1 bg-surface-2 border border-amber-400/50 rounded px-2 py-0.5 text-[10px] font-mono outline-none"
                                 />
                                 <button 
-                                  onClick={(e) => { e.stopPropagation(); handleRefreshModels(p.id); }}
+                                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleRefreshModels(p.id); }}
                                   disabled={fetchingModelsId === p.id}
                                   className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                                     fetchingModelsId === p.id 

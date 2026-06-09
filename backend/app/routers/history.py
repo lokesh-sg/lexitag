@@ -2,9 +2,9 @@
 
 import json
 from fastapi import APIRouter, Query, HTTPException
-from ..database import get_db
-from ..models import TagHistoryEntry, TagHistoryList, MessageResponse
-from ..services.fixer import revert_track
+from backend.app.database import get_db
+from backend.app.models import TagHistoryEntry, TagHistoryList, MessageResponse
+from backend.app.services.fixer import revert_track
 
 router = APIRouter(prefix="/api/history", tags=["history"])
 

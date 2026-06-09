@@ -4,9 +4,9 @@ import time
 import aiohttp
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from ..database import get_db
-from ..services.llm import quota_info, PROVIDER_PRESETS
-from ..security import encrypt_value
+from backend.app.database import get_db
+from backend.app.services.llm import quota_info, PROVIDER_PRESETS
+from backend.app.security import encrypt_value
 
 router = APIRouter(prefix="/api/settings", tags=["Settings"])
 
@@ -90,6 +90,92 @@ async def update_source(source_id: int, req: UpdateSourceReq):
         await db.execute(f"UPDATE library_sources SET {set_clause} WHERE id = ?", list(updates.values()) + [source_id])
         await db.commit()
     return {"message": "Source updated"}
+
+class RelocateRequest(BaseModel):
+    old_base_path: str
+    new_base_path: str
+
+@router.post("/sources/relocate")
+async def relocate_library(req: RelocateRequest):
+    """
+    Bulk update all library paths from an old base to a new base.
+    Useful when moving from Mac (/Volumes/...) to Ubuntu (/mnt/...) 
+    or inside Docker (/app/music).
+    """
+    import os
+    db = await get_db()
+    
+    # 1. Basic Validation
+    new_base = req.new_base_path.rstrip(os.path.sep)
+    old_base = req.old_base_path.rstrip(os.path.sep)
+    
+    if not os.path.isdir(new_base):
+        raise HTTPException(status_code=400, detail=f"New path '{new_base}' is not a valid directory or not accessible.")
+
+    # 2. Sample Check: Verify files exist at the new location
+    cursor = await db.execute(
+        "SELECT path FROM tracks WHERE path LIKE ? LIMIT 10", 
+        (f"{old_base}%",)
+    )
+    samples = await cursor.fetchall()
+    
+    if not samples:
+        raise HTTPException(status_code=404, detail=f"No tracks found in database starting with '{old_base}'.")
+
+    found_count = 0
+    for sample in samples:
+        potential_new_path = sample["path"].replace(old_base, new_base)
+        if os.path.exists(potential_new_path):
+            found_count += 1
+            
+    if found_count == 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Validation failed: None of the sample files from '{old_base}' were found at '{new_base}'. Please check your mapping."
+        )
+
+    # 3. Execution
+    try:
+        # Update Sources
+        await db.execute(
+            "UPDATE library_sources SET path = REPLACE(path, ?, ?) WHERE path LIKE ?",
+            (old_base, new_base, f"{old_base}%")
+        )
+        
+        # Update Tracks
+        cursor = await db.execute(
+            "UPDATE tracks SET path = REPLACE(path, ?, ?) WHERE path LIKE ?",
+            (old_base, new_base, f"{old_base}%")
+        )
+        tracks_updated = cursor.rowcount
+        
+        # Update History
+        cursor = await db.execute(
+            "UPDATE tag_history SET track_path = REPLACE(track_path, ?, ?) WHERE track_path LIKE ?",
+            (old_base, new_base, f"{old_base}%")
+        )
+        history_updated = cursor.rowcount
+        
+        # 4. Optional: Clean up duplicates if a scan was already partially run on new location
+        # This keeps the most recently scanned or lowest ID entry
+        await db.execute("""
+            DELETE FROM tracks 
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM tracks GROUP BY path
+            )
+        """)
+        
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Relocation failed: {str(e)}")
+
+    return {
+        "message": "Library relocated successfully",
+        "tracks_updated": tracks_updated,
+        "history_updated": history_updated,
+        "sample_match_percentage": (found_count / len(samples)) * 100
+    }
 
 @router.delete("/sources/{source_id}")
 async def delete_source(source_id: int):
@@ -238,7 +324,7 @@ async def activate_provider(provider_id: int):
 @router.get("/llm/providers/{provider_id}/models")
 async def get_provider_models(provider_id: int):
     """Fetch available models for a provider directly from its API."""
-    from ..services import llm
+    from backend.app.services import llm
     models = await llm.fetch_models(provider_id)
     return {"models": models}
 
@@ -324,7 +410,7 @@ async def add_cleanup_pattern(req: CreateCleanupPattern):
         raise HTTPException(status_code=400, detail="Pattern already exists")
     
     # Reload cleaner patterns in-memory
-    from ..services.local_cleaner import load_dynamic_patterns
+    from backend.app.services.local_cleaner import load_dynamic_patterns
     await load_dynamic_patterns()
     
     return {"message": "Pattern added"}
@@ -337,7 +423,7 @@ async def delete_cleanup_pattern(pattern_id: int):
     await db.commit()
     
     # Reload cleaner patterns in-memory
-    from ..services.local_cleaner import load_dynamic_patterns
+    from backend.app.services.local_cleaner import load_dynamic_patterns
     await load_dynamic_patterns()
     
     return {"message": "Pattern deleted"}
@@ -394,7 +480,7 @@ async def accept_cleanup_suggestion(suggestion_id: int):
         raise HTTPException(status_code=500, detail=f"Failed to accept suggestion: {e}")
         
     # 4. Reload cleaner patterns in-memory
-    from ..services.local_cleaner import load_dynamic_patterns
+    from backend.app.services.local_cleaner import load_dynamic_patterns
     await load_dynamic_patterns()
     
     return {"message": "Suggestion accepted and patterns reloaded"}

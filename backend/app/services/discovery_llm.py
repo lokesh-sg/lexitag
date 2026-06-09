@@ -2,7 +2,7 @@
 """Discovery service — uses LLM to identify the 'Truth' about a song."""
 
 import json
-from .llm import chat_completion
+from backend.app.services.llm import chat_completion
 
 SYSTEM_PROMPT = (
     "You are a music encyclopedia and retrieval expert. Your task is to accurately identify "

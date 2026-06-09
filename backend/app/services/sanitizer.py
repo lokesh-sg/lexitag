@@ -1,7 +1,7 @@
 """Sanitizer service — uses LLM to clean junk from audio metadata."""
 
 import json
-from .llm import chat_completion
+from backend.app.services.llm import chat_completion
 
 SYSTEM_PROMPT = (
     "You are a forensic music metadata restoration expert. Use EVERY available clue to reconstruct studio-quality metadata.\n\n"

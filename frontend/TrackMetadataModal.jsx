@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchRawTags, updateTracks, fetchHistory, fetchTrack } from '../api';
+import { fetchRawTags, updateTracks, fetchHistory, fetchTrack, previewFix } from '../api';
 import { useFixerContext } from '../contexts/AppContext';
 import HistoryDiffModal from './HistoryDiffModal';
 
@@ -19,6 +19,7 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
   const [error, setError] = useState(null);
   const [showAddTag, setShowAddTag] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [previewResult, setPreviewResult] = useState(null);
   
   // Local state for editing raw tags
   const [editingRawKey, setEditingRawKey] = useState(null);
@@ -210,20 +211,50 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
     });
   };
 
-  const handleLocalFix = async () => {
+  const handleLocalFix = () => {
     const trackIds = tracks.map(t => t.id);
-    setSaving(true);
-    try {
-      const { localFixTracks } = await import('../api');
-      await localFixTracks(trackIds);
-      await loadData();
+    fixer.fix(trackIds, { local_only: true }, () => {
+      loadData();
       onUpdated && onUpdated();
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
-    } catch (err) {
-      setError(err.message || 'Local fix failed');
+    });
+  };
+
+  const handlePreviewFix = async () => {
+    if (isBulk) return;
+    setLoading(true);
+    try {
+      const trackIds = tracks.map(t => t.id);
+      const res = await previewFix(trackIds);
+      if (res.success && res.results && res.results.length > 0) {
+        const result = res.results[0];
+        const rawBefore = { ...rawTags }; 
+        const rawAfter = { ...rawTags };
+        
+        for (const [k, v] of Object.entries(result.diffs)) {
+            // Apply the 'old' value to the 'before' side
+            // This ensures synthetic keys like [Scanner Diagnostics] show their reason
+            if (v.old !== undefined && v.old !== null) {
+                rawBefore[k] = v.old;
+            }
+            
+            // Apply the 'new' value to our local state copy for 'after'
+            if (v.new !== undefined && v.new !== "") {
+                rawAfter[k] = v.new;
+            } else {
+                delete rawAfter[k];
+            }
+        }
+        
+        setPreviewResult({
+            track_path: result.filename,
+            raw_before: { ...rawBefore }, // Force new object ref
+            raw_after: { ...rawAfter }
+        });
+      }
+    } catch (e) {
+      setError("Preview failed: " + e.message);
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
@@ -478,6 +509,18 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
                       </button>
                     )}
                     <button 
+                      onClick={handlePreviewFix}
+                      disabled={fixer.isFixing || saving || isBulk}
+                      className="btn-secondary !text-[11px] !py-1.5 !px-3 flex items-center gap-2 group"
+                      title="Dry-run to see expected cleaning without saving"
+                    >
+                      <svg className="w-3.5 h-3.5 text-blue-300 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      Preview {tracks.length > 0 && !isBulk ? '' : '(Single)'}
+                    </button>
+                    <button 
                       onClick={handleLocalFix}
                       disabled={fixer.isFixing || saving}
                       className="btn-secondary !text-[11px] !py-1.5 !px-3 flex items-center gap-2 group"
@@ -544,6 +587,13 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
             <HistoryDiffModal 
                 entry={selectedHistoryEntry}
                 onClose={() => setSelectedHistoryEntry(null)}
+            />
+        )}
+        
+        {previewResult && !isAuditing && (
+            <HistoryDiffModal 
+                entry={previewResult}
+                onClose={() => setPreviewResult(null)}
             />
         )}
       </div>

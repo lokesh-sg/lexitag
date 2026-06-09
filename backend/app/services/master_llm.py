@@ -3,7 +3,7 @@
 
 import json
 import re
-from .llm import chat_completion
+from backend.app.services.llm import chat_completion
 
 SYSTEM_PROMPT = (
     "You are a forensic music metadata restoration expert and retrieval assistant.\n\n"
@@ -170,13 +170,13 @@ async def process_song_full(tags: dict, filename: str = "", parent_folder: str =
     
     if is_api_failure:
         print(f"[master_llm] Hard API Failure detected: {last_error}")
-        from .tagger import _log
+        from backend.app.services.tagger import _log
         _log(f"MASTER LLM API FAILURE: {filename} | {last_error}")
         raise RuntimeError(f"AI API Failure: {last_error}")
 
     # For identification failures (chatty AI, no JSON), we Soft-Fail to allow batch completion.
     print(f"[master_llm] AI could not identify '{filename}'. Soft-failing to allow skip.")
-    from .tagger import _log
+    from backend.app.services.tagger import _log
     _log(f"SKIPPED (AI GAVE UP): {filename} | LAST ERROR: {last_error}")
     # Log the offending body for developer analysis if possible
     if 'response' in locals():

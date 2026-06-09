@@ -8,27 +8,49 @@ from cryptography.fernet import Fernet
 from fastapi import HTTPException, Security, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pathlib import Path
-from .config import settings
+from backend.app.config import settings
 
 # ── Encryption & Decryption ──
 
 def _get_fernet() -> Fernet:
-    """Initialize Fernet with the master key."""
+    """
+    Initialize Fernet with the master key.
+    If LEXITAG_MASTER_KEY is not set, we attempt to load/save a persistent key 
+    file in the DATA_DIR to enable zero-touch production deployments.
+    """
     key = settings.LEXITAG_MASTER_KEY
+    
     if not key:
-        if settings.ENV == "production":
-            raise RuntimeError(
-                "LEXITAG_MASTER_KEY is not set. "
-                "This is required in production to protect stored API keys. "
-                "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
-            )
-        # Development only: use a stable derived key so encrypted values survive restarts
-        import logging
-        logging.warning("[SECURITY] LEXITAG_MASTER_KEY not set — using derived dev key. Set this in .env before going to production.")
-        key = "lexitag-dev-fallback-key-do-not-use-in-prod"
+        # Check for persistent key file in DATA_DIR
+        key_file = Path(settings.DATA_DIR) / ".master.key"
+        if key_file.exists():
+            key = key_file.read_text().strip()
+        elif settings.ENV == "production":
+            # AUTO-GENERATE for Zero-Touch Production
+            from cryptography.fernet import Fernet as F
+            new_key = F.generate_key().decode()
+            try:
+                os.makedirs(settings.DATA_DIR, exist_ok=True)
+                key_file.write_text(new_key)
+                logging.getLogger("lexitag").info(
+                    f"[SECURITY] Auto-generated persistent LEXITAG_MASTER_KEY at {key_file}. "
+                    "Keep this file safe for future data recovery."
+                )
+                key = new_key
+            except Exception as e:
+                logging.getLogger("lexitag").error(f"Failed to persist auto-generated key: {e}")
+                # Fallback to dev-style behavior if disk is read-only
+                key = "lexitag-prod-auto-fallback-insecure"
+        else:
+            # Development only: stable fallback
+            logging.warning("[SECURITY] LEXITAG_MASTER_KEY not set — using derived dev key.")
+            key = "lexitag-dev-fallback-key-do-not-use-in-prod"
+    
     try:
+        # Ensure it's a valid Fernet key (base64 32-byte)
         return Fernet(key.encode())
     except Exception:
+        # If user provided a plain string, we'll hash it into a valid Fernet key
         hashed_key = hashlib.sha256(key.encode()).digest()
         b64_key = base64.urlsafe_b64encode(hashed_key)
         return Fernet(b64_key)
@@ -93,7 +115,7 @@ def validate_path(filepath: str) -> str:
         
         # We need to check against all configured music directories
         # But usually we'll check against a common root or specific allowed paths.
-        from .database import get_db
+        from backend.app.database import get_db
         # This is a bit heavy for every scan, so we might want to cache or use settings.MUSIC_DIR
         # For now, let's just ensure it doesn't escape the DATA_DIR or system roots if possible.
         
@@ -112,7 +134,7 @@ def validate_path(filepath: str) -> str:
 
 async def migrate_unencrypted_keys():
     """Find plaintext keys in DB and encrypt them."""
-    from .database import get_db
+    from backend.app.database import get_db
     db = await get_db()
     
     cursor = await db.execute("SELECT id, api_key FROM llm_providers WHERE api_key IS NOT NULL AND api_key != ''")

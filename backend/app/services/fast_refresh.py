@@ -4,8 +4,8 @@ import sqlite3
 import asyncio
 import time
 from pathlib import Path
-from .scanner import scan_file
-from ..database import get_db
+from backend.app.services.scanner import scan_file
+from backend.app.database import get_db
 
 async def start_fast_refresh(job_id: str, progress_dict: dict):
     """

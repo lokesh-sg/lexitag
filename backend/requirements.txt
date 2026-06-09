@@ -8,3 +8,5 @@ aiohttp
 cryptography
 python-dotenv
 PyYAML
+async-upnp-client
+netifaces

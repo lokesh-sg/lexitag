@@ -8,7 +8,7 @@ import aiohttp
 import json
 import time
 import asyncio
-from ..security import decrypt_value
+from backend.app.security import decrypt_value
 
 _TIMEOUT = aiohttp.ClientTimeout(total=60)
 
@@ -107,7 +107,7 @@ def _parse_429_body(body: str) -> None:
 async def _get_active_provider() -> dict | None:
     """Load the active LLM provider from the database."""
     try:
-        from ..database import get_db
+        from backend.app.database import get_db
         db = await get_db()
         cursor = await db.execute("SELECT * FROM llm_providers WHERE is_active = 1 LIMIT 1")
         row = await cursor.fetchone()
@@ -127,7 +127,7 @@ async def _get_active_provider() -> dict | None:
 
     # Fallback: try settings from env
     try:
-        from ..config import settings
+        from backend.app.config import settings
         if settings.LLM_API_KEY:
             return {
                 "id": 0,
@@ -312,14 +312,14 @@ async def _call_openai_compatible(provider: dict, system_prompt: str, user_messa
 async def fetch_models(provider_id: int) -> list[str]:
     """Fetch available models for a specific provider from its API."""
     try:
-        from ..database import get_db
+        from backend.app.database import get_db
         db = await get_db()
         cursor = await db.execute("SELECT * FROM llm_providers WHERE id = ?", (provider_id,))
         p = await cursor.fetchone()
         if not p:
             # Check if it's the env fallback
             if provider_id == 0:
-                from ..config import settings
+                from backend.app.config import settings
                 p = {
                     "provider": "gemini",
                     "api_base": settings.LLM_API_BASE_URL or PROVIDER_PRESETS["gemini"]["api_base"],
@@ -328,14 +328,25 @@ async def fetch_models(provider_id: int) -> list[str]:
             else:
                 return []
         
-        from ..security import decrypt_value
+        from backend.app.security import decrypt_value
         p_dict = dict(p) if isinstance(p, dict) else dict(p) if type(p).__name__ == 'Row' else p
         
         provider_type = p_dict["provider"]
         api_key = p_dict.get("api_key", "")
         # If the key came from the DB it's likely encrypted, unless it's the unencrypted fallback
         if api_key and provider_id != 0:
-            api_key = decrypt_value(api_key)
+            if api_key.startswith("gAAAA"):
+                decrypted = decrypt_value(api_key)
+                if not decrypted:
+                    print(f"[llm] Warning: Decryption failed for provider {provider_id} key. Key might be corrupt or master key changed.")
+                api_key = decrypted
+            else:
+                # Key is likely plaintext, use it directly (will be encrypted on next app startup)
+                print(f"[llm] Using plaintext key for provider {provider_id} (not yet migrated).")
+            
+        if not api_key:
+            print(f"[llm] Error: API key is empty for provider {provider_id} after resolution.")
+            return []
             
         api_base = p_dict["api_base"].rstrip("/")
 
@@ -343,12 +354,17 @@ async def fetch_models(provider_id: int) -> list[str]:
             if provider_type == "gemini":
                 # Google Gemini Model List
                 url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-                async with session.get(url) as resp:
+                headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
+                print(f"[llm] Fetching Gemini models (Key Length: {len(api_key)})")
+                async with session.get(url, headers=headers) as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         # We specifically want models that support generateContent
                         return [m["name"].replace("models/", "") for m in data.get("models", []) 
                                 if "generateContent" in m.get("supportedGenerationMethods", [])]
+                    else:
+                        body = await resp.text()
+                        print(f"[llm] Gemini model fetch failed with status {resp.status}: {body[:500]}")
             
             elif provider_type == "claude":
                 # Anthropic doesn't have a public "list models" endpoint easily usable with API Keys
@@ -366,6 +382,9 @@ async def fetch_models(provider_id: int) -> list[str]:
                         models = data.get("data", [])
                         if isinstance(models, list):
                             return [m["id"] for m in models if isinstance(m, dict) and "id" in m]
+                    else:
+                        body = await resp.text()
+                        print(f"[llm] OpenAI model fetch failed with status {resp.status}: {body[:500]}")
         
     except Exception as e:
         print(f"[llm] Failed to fetch models for provider {provider_id}: {e}")
