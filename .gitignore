@@ -8,7 +8,6 @@ venv/
 
 # Node
 node_modules/
-dev/frontend/dist/
 frontend/dist/
 
 # Environment — never commit secrets
@@ -24,7 +23,6 @@ frontend/dist/
 
 # Data directory — contains live database and runtime logs
 data/
-dev/data/
 
 # Build archives
 builds/*.zip
@@ -41,18 +39,3 @@ Thumbs.db
 
 # macOS Finder clutter
 *.textClipping
-
-# Debug files and backups
-*.tar
-*.tar.*
-.master.key
-.!*
-*.bak
-*.mp3
-*.flac
-*.wav
-*.db.old*
-backend.log
-.agents/
-dev/
-backups/
