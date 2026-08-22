@@ -87,9 +87,14 @@ def _get_id3_tags(audio) -> dict:
     # Check all USLT frames; prioritize those with content
     for key in id3:
         if key.startswith("USLT"):
-            val = str(id3[key])
+            frame = id3[key]
+            val = getattr(frame, "text", "")
+            if isinstance(val, list):
+                val = "\n".join([str(t) for t in val])
+            else:
+                val = str(val)
             if val.strip():
-                tags["lyrics"] = val
+                tags["lyrics"] = val.strip()
                 break
     
     # If no USLT, check for SYLT (synchronized lyrics)
@@ -260,32 +265,38 @@ def scan_file(filepath: str) -> dict | None:
                 tags = _get_id3_tags(audio)
                 fmt = "wav"
             except Exception as e:
-                print(f"[scanner] WAVE loader failed for {filepath}, trying explicit ID3: {e}")
+                print(f"[scanner] WAVE loader failed for {filepath}: {e}")
+                audio = None
+                tags = {
+                    "title": "", "artist": "", "album": "", "genre": "",
+                    "year": "", "lyrics": "", "comment": "", "composer": "", "language": ""
+                }
+                fmt = "wav"
+
+            # Check explicit ID3 container inside WAV if lyrics or main fields are missing
+            if not tags or not tags.get("lyrics") or not tags.get("title"):
                 try:
                     from mutagen.id3 import ID3
-                    audio = ID3(filepath)
-                    tags = _get_id3_tags(audio)
-                    fmt = "wav"
-                except Exception as e2:
-                    print(f"[scanner] ID3 fallback also failed: {e2}")
-                    audio = None
-                    tags = {
-                        "title": "", "artist": "", "album": "", "genre": "",
-                        "year": "", "lyrics": "", "comment": "", "composer": "", "language": ""
-                    }
-                    fmt = "wav"
+                    id3_audio = ID3(filepath)
+                    id3_tags = _get_id3_tags(id3_audio)
+                    if id3_tags:
+                        for k, v in id3_tags.items():
+                            if v and (not tags.get(k) or k == "lyrics"):
+                                tags[k] = v
+                except Exception:
+                    pass
 
             # Fallback to RIFF INFO if standard fields are empty (if we have a usable object)
-            if not tags["title"] or not tags["artist"]:
+            if not tags.get("title") or not tags.get("artist"):
                 try:
                     from mutagen.riff import INFO
                     riff = INFO(filepath)
                     if riff:
-                        if not tags["title"]: tags["title"] = str(riff.get("INAM", [""])[0])
-                        if not tags["artist"]: tags["artist"] = str(riff.get("IART", [""])[0])
-                        if not tags["album"]: tags["album"] = str(riff.get("IPRD", [""])[0])
-                        if not tags["genre"]: tags["genre"] = str(riff.get("IGNR", [""])[0])
-                        if not tags["year"]: tags["year"] = str(riff.get("ICRD", [""])[0])
+                        if not tags.get("title"): tags["title"] = str(riff.get("INAM", [""])[0])
+                        if not tags.get("artist"): tags["artist"] = str(riff.get("IART", [""])[0])
+                        if not tags.get("album"): tags["album"] = str(riff.get("IPRD", [""])[0])
+                        if not tags.get("genre"): tags["genre"] = str(riff.get("IGNR", [""])[0])
+                        if not tags.get("year"): tags["year"] = str(riff.get("ICRD", [""])[0])
                 except Exception:
                     pass
         else:

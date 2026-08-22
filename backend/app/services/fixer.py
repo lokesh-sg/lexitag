@@ -60,16 +60,17 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
             await notify("read", "error", "Could not read audio file")
             return {"success": False, "error": "Could not read file"}
 
+        row_dict = dict(row) if row else {}
         original_tags = {
-            "title": file_data.get("title", ""),
-            "artist": file_data.get("artist", ""),
-            "album": file_data.get("album", ""),
-            "genre": file_data.get("genre", ""),
-            "year": file_data.get("year", ""),
-            "comment": file_data.get("comment", ""),
-            "lyrics": file_data.get("lyrics", ""),
-            "language": file_data.get("language", ""),
-            "composer": file_data.get("composer", ""),
+            "title": file_data.get("title") or row_dict.get("title", "") or "",
+            "artist": file_data.get("artist") or row_dict.get("artist", "") or "",
+            "album": file_data.get("album") or row_dict.get("album", "") or "",
+            "genre": file_data.get("genre") or row_dict.get("genre", "") or "",
+            "year": file_data.get("year") or row_dict.get("year", "") or "",
+            "comment": file_data.get("comment") or row_dict.get("comment", "") or "",
+            "lyrics": file_data.get("lyrics") or row_dict.get("lyrics", "") or "",
+            "language": file_data.get("language") or row_dict.get("language", "") or "",
+            "composer": file_data.get("composer") or row_dict.get("composer", "") or "",
         }
         
         # Capture raw tags for Deep Cleaning
@@ -111,6 +112,8 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
         pre_cleaned_original = pre_clean_tags(original_tags)
         
         tags_to_sanitize = {**pre_cleaned_original, **pre_cleaned_tags}
+        if not tags_to_sanitize.get("title"):
+            tags_to_sanitize["title"] = Path(track_name).stem
         tags_to_sanitize["current_filename"] = track_name
         tags_to_sanitize["parent_folder"] = Path(track_path).parent.name
         
@@ -215,7 +218,7 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
             if not lyrics or not lyrics.strip():
                 if llm_lyrics_found and "LYRICS_NOT_FOUND" not in llm_lyrics_found:
                     lyrics = llm_lyrics_found
-                elif not lyrics_only:
+                else:
                     lyrics = await fetch_lyrics_llm(
                         artist=cleaned_tags.get("artist", ""),
                         title=cleaned_tags.get("title", ""),
@@ -320,6 +323,13 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
         fix_type = 'rename' if filenames_only else ('local' if local_only else ('lyrics' if lyrics_only else 'llm'))
         count_field = "local_fix_count" if (local_only or filenames_only) else "llm_fix_count"
 
+        final_title = final_summary.get("title") or cleaned_tags.get("title") or original_tags.get("title") or ""
+        final_artist = final_summary.get("artist") or cleaned_tags.get("artist") or original_tags.get("artist") or ""
+        final_album = final_summary.get("album") or cleaned_tags.get("album") or original_tags.get("album") or ""
+        final_genre = final_summary.get("genre") or cleaned_tags.get("genre") or original_tags.get("genre") or ""
+        final_year = final_summary.get("year") or cleaned_tags.get("year") or original_tags.get("year") or ""
+        final_composer = final_summary.get("composer") or cleaned_tags.get("composer") or original_tags.get("composer") or ""
+
         await db.execute(
             f"""UPDATE tracks SET
                 title = ?, artist = ?, album = ?, genre = ?, year = ?, composer = ?,
@@ -329,13 +339,13 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
                 last_fixed_at = ?, last_ai_fix_duration = ?
                WHERE id = ?""",
             (
-                final_summary.get("title", ""),
-                final_summary.get("artist", ""),
-                final_summary.get("album", ""),
-                final_summary.get("genre", ""),
-                final_summary.get("year", ""),
-                final_summary.get("composer", ""),
-                1 if final_summary.get("has_lyrics") else 0,
+                final_title,
+                final_artist,
+                final_album,
+                final_genre,
+                final_year,
+                final_composer,
+                1 if (lyrics and lyrics.strip()) or final_summary.get("has_lyrics") else 0,
                 "", # Stop saving lyrics to DB
                 language,
                 time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -367,8 +377,22 @@ async def revert_track(history_id: int) -> dict:
         return {"success": False, "error": "Invalid or already reverted history entry"}
 
     track_path = row["track_path"]
+    track_id = row["track_id"]
     original_tags = json.loads(row["original_tags"] or "{}")
     raw_before = json.loads(row["raw_before"] or "{}")
+
+    # Safety Fallback: If original_tags recorded empty fields (e.g. from an earlier failed fix),
+    # look back through previous history entries for this track to recover non-empty values.
+    prev_cursor = await db.execute(
+        "SELECT original_tags FROM tag_history WHERE (track_id = ? OR track_path = ?) AND id < ? ORDER BY id DESC",
+        (track_id, track_path, history_id)
+    )
+    prev_rows = await prev_cursor.fetchall()
+    for prev_row in prev_rows:
+        prev_tags = json.loads(prev_row["original_tags"] or "{}")
+        for k in ["title", "artist", "album", "genre", "year", "composer", "comment", "language"]:
+            if not original_tags.get(k) and prev_tags.get(k):
+                original_tags[k] = prev_tags[k]
 
     lyrics = original_tags.pop("lyrics", "")
     language = original_tags.pop("language", "")
@@ -382,27 +406,37 @@ async def revert_track(history_id: int) -> dict:
 
     # Re-scan file and sync database record
     file_data = scan_file(track_path)
-    if file_data:
-        await db.execute(
-            """UPDATE tracks SET
-                title = ?, artist = ?, album = ?, genre = ?, year = ?, composer = ?, comment = ?,
-                has_lyrics = ?, language = ?, has_junk = ?, raw_tags_json = ?, last_scanned = ?
-               WHERE path = ?""",
-            (
-                file_data["title"],
-                file_data["artist"],
-                file_data["album"],
-                file_data["genre"],
-                file_data["year"],
-                file_data["composer"],
-                file_data.get("comment", ""),
-                1 if file_data["has_lyrics"] else 0,
-                file_data.get("language", ""),
-                1 if file_data["has_junk"] else 0,
-                file_data.get("raw_tags_json", "{}"),
-                file_data["last_scanned"],
-                track_path
-            ),
-        )
+    final_title = (file_data.get("title") if file_data else "") or original_tags.get("title", "")
+    final_artist = (file_data.get("artist") if file_data else "") or original_tags.get("artist", "")
+    final_album = (file_data.get("album") if file_data else "") or original_tags.get("album", "")
+    final_genre = (file_data.get("genre") if file_data else "") or original_tags.get("genre", "")
+    final_year = (file_data.get("year") if file_data else "") or original_tags.get("year", "")
+    final_composer = (file_data.get("composer") if file_data else "") or original_tags.get("composer", "")
+    final_comment = (file_data.get("comment") if file_data else "") or original_tags.get("comment", "")
+    final_language = (file_data.get("language") if file_data else "") or language
+    final_lyrics = (file_data.get("lyrics") if file_data else "") or lyrics
+
+    await db.execute(
+        """UPDATE tracks SET
+            title = ?, artist = ?, album = ?, genre = ?, year = ?, composer = ?, comment = ?,
+            has_lyrics = ?, language = ?, has_junk = ?, raw_tags_json = ?, last_scanned = ?
+           WHERE path = ? OR id = ?""",
+        (
+            final_title,
+            final_artist,
+            final_album,
+            final_genre,
+            final_year,
+            final_composer,
+            final_comment,
+            1 if final_lyrics else 0,
+            final_language,
+            1 if (file_data and file_data.get("has_junk")) else 0,
+            file_data.get("raw_tags_json", "{}") if file_data else "{}",
+            time.strftime("%Y-%m-%d %H:%M:%S"),
+            track_path,
+            track_id
+        ),
+    )
     await db.commit()
     return {"success": True, "message": "Reverted successfully"}

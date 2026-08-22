@@ -10,12 +10,26 @@ import os
 import logging
 
 # Initialize Logging
+import logging.handlers
+LOG_DIR = Path("data")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE_PATH = LOG_DIR / "lexitag.log"
+
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     force=True  # Ensure we override any default uvicorn handlers
 )
+
+# File Handler for persistent app logging & browser download
+file_handler = logging.handlers.RotatingFileHandler(
+    LOG_FILE_PATH, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+)
+file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+
+root_logger = logging.getLogger()
+root_logger.addHandler(file_handler)
 
 # Explicitly enable verbose debugging for UPnP library
 logging.getLogger('async_upnp_client').setLevel(logging.DEBUG)
@@ -59,7 +73,7 @@ try:
     _version_path = Path(__file__).resolve().parent.parent.parent / "VERSION"
     VERSION = _version_path.read_text().strip()
 except:
-    VERSION = "0.1.5"
+    VERSION = "0.1.6"
 
 
 app = FastAPI(

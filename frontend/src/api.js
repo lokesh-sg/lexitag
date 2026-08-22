@@ -314,4 +314,25 @@ export const dismissCleanupSuggestion = async (id) => {
   return response.data;
 };
 
+// ── System Logs ──
+
+export async function fetchSystemLogs(lines = 500) {
+    const { data } = await api.get('/settings/logs/view', { params: { lines } });
+    return data;
+}
+
+export async function toggleDebugLogging(enabled) {
+    const { data } = await api.post('/settings/logs/toggle', null, { params: { enabled } });
+    return data;
+}
+
+export async function clearSystemLogs() {
+    const { data } = await api.post('/settings/logs/clear');
+    return data;
+}
+
+export function getLogsDownloadUrl() {
+    return '/api/settings/logs/download';
+}
+
 export default api;

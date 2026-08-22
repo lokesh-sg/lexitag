@@ -763,7 +763,7 @@ async def get_raw_tags(track_id: int):
 
 @router.get("/{track_id}/lyrics")
 async def get_track_lyrics(track_id: int):
-    """Fetch lyrics directly from the file on disk (Single Source of Truth)."""
+    """Fetch lyrics directly from file on disk, with fallback to history."""
     from backend.app.services.scanner import scan_file
     db = await get_db()
     cursor = await db.execute("SELECT path FROM tracks WHERE id = ?", (track_id,))
@@ -771,14 +771,34 @@ async def get_track_lyrics(track_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="Track not found")
         
+    lyrics = ""
     try:
         data = scan_file(row["path"])
-        if not data:
-            raise HTTPException(status_code=500, detail="Could not read file")
+        if data:
+            lyrics = data.get("lyrics", "")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Audio file not found on disk. Is the volume mounted?")
+    except Exception:
+        pass
         
-    return {"lyrics": data.get("lyrics", "")}
+    if not lyrics or not lyrics.strip():
+        h_cursor = await db.execute(
+            "SELECT changed_tags, original_tags FROM tag_history WHERE (track_id = ? OR track_path = ?) ORDER BY id DESC",
+            (track_id, row["path"])
+        )
+        history_rows = await h_cursor.fetchall()
+        for h in history_rows:
+            try:
+                ct = json.loads(h["changed_tags"]) if h["changed_tags"] else {}
+                ot = json.loads(h["original_tags"]) if h["original_tags"] else {}
+                l = ct.get("lyrics") or ot.get("lyrics")
+                if l and l.strip() and "LYRICS_NOT_FOUND" not in l:
+                    lyrics = l.strip()
+                    break
+            except Exception:
+                pass
+
+    return {"lyrics": lyrics}
 
 
 @router.get("/{track_id}/cover")

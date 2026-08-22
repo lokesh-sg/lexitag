@@ -492,3 +492,70 @@ async def dismiss_cleanup_suggestion(suggestion_id: int):
     await db.execute("UPDATE cleanup_suggestions SET status = 'dismissed' WHERE id = ?", (suggestion_id,))
     await db.commit()
     return {"message": "Suggestion dismissed"}
+
+
+# ── System Logs & Debug Management ──
+
+import logging
+from pathlib import Path
+from fastapi.responses import FileResponse
+
+LOG_FILE_PATH = Path("data/lexitag.log")
+
+@router.get("/logs/view")
+async def get_system_logs(lines: int = 500):
+    """View recent log entries."""
+    if not LOG_FILE_PATH.exists():
+        return {"logs": [], "level": logging.getLevelName(logging.getLogger().level)}
+    try:
+        with open(LOG_FILE_PATH, "r", encoding="utf-8", errors="ignore") as f:
+            all_lines = f.readlines()
+            recent = [line.strip() for line in all_lines[-lines:] if line.strip()]
+            return {"logs": recent, "level": logging.getLevelName(logging.getLogger().level)}
+    except Exception as e:
+        return {"logs": [f"Error reading log file: {e}"], "level": "INFO"}
+
+@router.get("/logs/download")
+async def download_system_logs():
+    """Download the full system log file directly."""
+    if not LOG_FILE_PATH.exists():
+        LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(LOG_FILE_PATH, "w", encoding="utf-8") as f:
+            f.write(f"=== LexiTag System Log Started at {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
+    
+    return FileResponse(
+        path=str(LOG_FILE_PATH),
+        filename=f"lexitag_system_log_{time.strftime('%Y%m%d_%H%M%S')}.log",
+        media_type="text/plain"
+    )
+
+@router.post("/logs/toggle")
+async def toggle_debug_logging(enabled: bool | None = None):
+    """Toggle DEBUG level logging ON/OFF at runtime."""
+    root_logger = logging.getLogger()
+    if enabled is None:
+        new_level = logging.INFO if root_logger.level == logging.DEBUG else logging.DEBUG
+    else:
+        new_level = logging.DEBUG if enabled else logging.INFO
+    
+    root_logger.setLevel(new_level)
+    for handler in root_logger.handlers:
+        handler.setLevel(new_level)
+        
+    db = await get_db()
+    await db.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES ('debug_logging', ?)",
+        ("1" if new_level == logging.DEBUG else "0",)
+    )
+    await db.commit()
+    level_name = logging.getLevelName(new_level)
+    root_logger.info(f"Log level updated to {level_name}")
+    return {"debug_logging": new_level == logging.DEBUG, "level": level_name}
+
+@router.post("/logs/clear")
+async def clear_system_logs():
+    """Clear/truncate the system log file."""
+    if LOG_FILE_PATH.exists():
+        with open(LOG_FILE_PATH, "w", encoding="utf-8") as f:
+            f.write(f"=== LexiTag System Log Reset at {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
+    return {"message": "Logs cleared successfully"}

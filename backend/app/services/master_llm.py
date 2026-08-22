@@ -145,6 +145,11 @@ async def process_song_full(tags: dict, filename: str = "", parent_folder: str =
                         low_v = v.lower()
                         if any(x in low_v for x in ["unknown artist", "unknown genre", "unknown album", "various artist", "unknown year"]):
                             result["metadata"][k] = ""
+                
+                # Fill missing/empty metadata keys from input tags if available
+                for k in ["title", "artist", "album", "genre", "year", "composer"]:
+                    if not result["metadata"].get(k) and tags.get(k):
+                        result["metadata"][k] = tags[k]
             
             # Cache the result
             if result:

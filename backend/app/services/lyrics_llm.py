@@ -42,14 +42,22 @@ async def fetch_lyrics_llm(artist: str, title: str, album: str = "", on_retry: c
     """
     Fetch lyrics using Gemini with Google Search Grounding.
     """
-    if not artist or not title:
+    if not title and not album:
         return ""
 
     # Clean movie name
     clean_album = re.sub(r'\(.*?\)', '', album).strip() if album else ""
     
     # Ask the LLM to search for the specific track
-    user_msg = f"Search Google for the full lyrics to the song '{title}' by '{artist}' from the movie '{clean_album}'."
+    if artist and clean_album:
+        user_msg = f"Search Google for the full lyrics to the song '{title}' by '{artist}' from the movie '{clean_album}'."
+    elif artist:
+        user_msg = f"Search Google for the full lyrics to the song '{title}' by '{artist}'."
+    elif clean_album:
+        user_msg = f"Search Google for the full lyrics to the song '{title}' from the movie '{clean_album}'."
+    else:
+        user_msg = f"Search Google for the full lyrics to the song '{title}'."
+
     print(f"[lyrics_llm] Grounded Request: {user_msg}")
     
     # Enable Google Search Grounding tool

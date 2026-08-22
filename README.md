@@ -1,6 +1,6 @@
 # LexiTag
 
-**Version:** 0.1.5 | **Language:** Python 3.12 / React 18 | **Database:** SQLite
+**Version:** 0.1.6 | **Language:** Python 3.12 / React 18 | **Database:** SQLite
 
 LexiTag is a self-hosted music library metadata manager. It scans your audio files, cleans junk metadata, enriches tags using an AI model, fetches lyrics, and provides a web-based UI for browsing and editing your entire library. Everything runs locally — no cloud sync required.
 
@@ -293,6 +293,14 @@ The batch engine retries on API failures and soft-skips tracks the AI cannot ide
 ---
 
 ## Release Notes
+
+### v0.1.6 (2026-08-22)
+- **Metadata Protection Engine**: Guaranteed that manual edits and existing track metadata (title, artist, album, year, composer) are never erased or blanked out during AI Fix operations.
+- **Backward History Revert System**: Fixed track revert logic to inspect prior tag history records and recover earlier non-empty metadata even if prior runs recorded empty states.
+- **System Logs & Live Debug Mode**: Added persistent server log rotation (`data/lexitag.log`), runtime `DEBUG`/`INFO` log toggle endpoint (`/api/settings/logs/toggle`), direct log file attachment download endpoint (`/api/settings/logs/download`), and an interactive terminal log viewer in the Settings panel.
+- **Universal Google Search Grounded Lyrics**: Enabled Gemini Google Search Grounding fallback for regional, Indian, and Tamil songs when LRCLIB has no match. Updated query generator to operate flexibly even when artist tags are absent.
+- **Enhanced WAV & USLT Tag Parsing**: Fixed Mutagen `USLT.text` extraction and added explicit `ID3(filepath)` container scanning for `.wav` files to ensure 100% reliable lyrics reading from disk.
+- **Track Edit Modal Lyrics Fallback**: Enhanced `/api/tracks/{id}/lyrics` endpoint to fallback to `tag_history` whenever disk scanner returns empty text, guaranteeing lyrics populate in the UI edit modal.
 
 ### v0.1.5 (2026-08-21)
 - Fixed missing `language` column in background scanner SQL `INSERT` and `UPDATE` queries.

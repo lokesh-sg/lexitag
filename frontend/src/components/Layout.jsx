@@ -16,9 +16,9 @@ export default function Layout({ children }) {
     fetch('/api/health')
       .then(res => res.json())
       .then(data => {
-        if (data.version) setVersion('V' + data.version);
+        if (data.version) setVersion('v' + data.version);
       })
-      .catch(() => setVersion('V0.1.3'));
+      .catch(() => setVersion('v0.1.6'));
   }, []);
 
   React.useEffect(() => {

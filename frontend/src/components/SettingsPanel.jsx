@@ -19,7 +19,11 @@ import {
   deleteCleanupPattern,
   fetchCleanupSuggestions,
   acceptCleanupSuggestion,
-  dismissCleanupSuggestion
+  dismissCleanupSuggestion,
+  fetchSystemLogs,
+  toggleDebugLogging,
+  clearSystemLogs,
+  getLogsDownloadUrl
 } from '../api';
 
 export default function SettingsPanel({ visible, onClose }) {
@@ -34,6 +38,10 @@ export default function SettingsPanel({ visible, onClose }) {
   const [cleanupPatterns, setCleanupPatterns] = useState([]);
   const [cleanupSuggestions, setCleanupSuggestions] = useState([]);
   const [newPattern, setNewPattern] = useState({ pattern: '', category: 'junk', is_regex: false });
+  
+  const [logs, setLogs] = useState([]);
+  const [logLevel, setLogLevel] = useState('INFO');
+  const [logsLoading, setLogsLoading] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -54,12 +62,45 @@ export default function SettingsPanel({ visible, onClose }) {
   useEffect(() => {
     if (visible) {
       loadAll();
+      if (activeTab === 'logs') loadLogs();
       quotaTimer.current = setInterval(loadQuota, 30000);
     } else {
       clearInterval(quotaTimer.current);
     }
     return () => clearInterval(quotaTimer.current);
-  }, [visible]);
+  }, [visible, activeTab]);
+
+  async function loadLogs() {
+    setLogsLoading(true);
+    try {
+      const data = await fetchSystemLogs(500);
+      setLogs(data.logs || []);
+      setLogLevel(data.level || 'INFO');
+    } catch (err) {
+      setError('Failed to fetch system logs');
+    } finally {
+      setLogsLoading(false);
+    }
+  }
+
+  async function handleToggleDebug() {
+    try {
+      const res = await toggleDebugLogging(logLevel !== 'DEBUG');
+      setLogLevel(res.level);
+      loadLogs();
+    } catch (err) {
+      setError('Failed to toggle debug logging');
+    }
+  }
+
+  async function handleClearLogs() {
+    try {
+      await clearSystemLogs();
+      loadLogs();
+    } catch (err) {
+      setError('Failed to clear logs');
+    }
+  }
 
   async function loadAll() {
     setLoading(true);
@@ -296,6 +337,14 @@ export default function SettingsPanel({ visible, onClose }) {
             }`}
           >
             System Config
+          </button>
+          <button 
+            onClick={() => setActiveTab('logs')}
+            className={`px-5 py-3 text-xs font-bold uppercase tracking-widest transition-all ${
+              activeTab === 'logs' ? 'text-amber-400 border-b-2 border-amber-400 bg-surface-1' : 'text-ink-faint hover:text-ink-muted'
+            }`}
+          >
+            System Logs
           </button>
         </div>
         <button 
@@ -837,6 +886,105 @@ export default function SettingsPanel({ visible, onClose }) {
               {providers.length === 0 && !loading && (
                 <div className="text-center py-10 opacity-40 grayscale">
                   <p className="text-xs">No providers configured yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'logs' && (
+          <div className="space-y-4 animate-scale-in">
+            {/* Header & Controls */}
+            <div className="p-4 rounded-xl bg-surface-2 border border-surface-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h4 className="text-xs font-bold text-ink-rich uppercase tracking-wider flex items-center gap-2">
+                  <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="4 17 10 11 4 5" />
+                    <line x1="12" y1="19" x2="20" y2="19" />
+                  </svg>
+                  System & Application Logs
+                </h4>
+                <p className="text-[10px] text-ink-faint mt-0.5">
+                  Track forensic errors, API calls, and background worker executions in real-time.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Debug Logging Toggle */}
+                <button
+                  onClick={handleToggleDebug}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border ${
+                    logLevel === 'DEBUG'
+                      ? 'bg-amber-400/10 text-amber-400 border-amber-400/40 shadow-sm'
+                      : 'bg-surface-1 text-ink-muted border-surface-4 hover:border-surface-6'
+                  }`}
+                  title="Toggle Verbose Debug Logging"
+                >
+                  <div className={`w-2 h-2 rounded-full ${logLevel === 'DEBUG' ? 'bg-amber-400 animate-ping' : 'bg-ink-faint'}`} />
+                  Debug Mode: {logLevel === 'DEBUG' ? 'ON' : 'OFF'}
+                </button>
+
+                {/* Direct Download Log File */}
+                <a
+                  href={getLogsDownloadUrl()}
+                  download
+                  className="btn-primary !py-1.5 !px-3 text-xs flex items-center gap-1.5 text-black font-bold"
+                  title="Download full log file to your device"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download Log File
+                </a>
+
+                {/* Refresh Logs */}
+                <button
+                  onClick={loadLogs}
+                  disabled={logsLoading}
+                  className="p-1.5 rounded-lg bg-surface-1 border border-surface-4 text-ink-muted hover:text-ink-rich hover:bg-surface-3 transition-colors"
+                  title="Refresh Log View"
+                >
+                  <svg className={`w-4 h-4 ${logsLoading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                  </svg>
+                </button>
+
+                {/* Clear Logs */}
+                <button
+                  onClick={handleClearLogs}
+                  className="p-1.5 rounded-lg bg-surface-1 border border-surface-4 text-fn-danger/70 hover:text-fn-danger hover:bg-fn-danger/10 transition-colors"
+                  title="Clear Log File"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Terminal Log Console */}
+            <div className="p-4 rounded-xl bg-black/90 border border-surface-4 font-mono text-[11px] leading-relaxed text-zinc-300 max-h-[350px] overflow-y-auto shadow-inner space-y-1 select-text">
+              {logs.length > 0 ? (
+                logs.map((line, idx) => {
+                  let colorClass = "text-zinc-300";
+                  if (line.includes("[ERROR]") || line.includes("Error") || line.includes("FAILED")) colorClass = "text-red-400 font-bold bg-red-950/30 px-1 rounded";
+                  else if (line.includes("[WARNING]") || line.includes("Warning")) colorClass = "text-amber-300 font-medium";
+                  else if (line.includes("[DEBUG]")) colorClass = "text-cyan-400";
+                  else if (line.includes("[INFO]") || line.includes("SUCCESS")) colorClass = "text-emerald-400";
+
+                  return (
+                    <div key={idx} className={`${colorClass} whitespace-pre-wrap break-all border-b border-white/5 pb-0.5`}>
+                      {line}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-12 text-center text-zinc-500 italic">
+                  No log entries recorded yet. System log is clean.
                 </div>
               )}
             </div>
