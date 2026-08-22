@@ -298,6 +298,7 @@ The batch engine retries on API failures and soft-skips tracks the AI cannot ide
 - Fixed missing `language` column in background scanner SQL `INSERT` and `UPDATE` queries.
 - Enhanced multi-format language tag extraction for ID3 (`TLAN`, `TXXX:Language`), FLAC (`language`, `lang`, `tlan`), and MP4 (`\xa9lan`).
 - Added standalone **Language** column to library table UI with sorting, column manager toggling, and re-ordering support.
+- Fixed history revert routine to properly restore physical audio file tags and database records across all metadata attributes (title, artist, album, genre, year, composer, comment, lyrics, language, and raw tags).
 - Audited and updated all frontend and backend dependencies to eliminate security vulnerabilities (0 npm audit vulnerabilities).
 
 ### v0.1.4 (2026-06-09)
