@@ -59,7 +59,7 @@ try:
     _version_path = Path(__file__).resolve().parent.parent.parent / "VERSION"
     VERSION = _version_path.read_text().strip()
 except:
-    VERSION = "0.1.4"
+    VERSION = "0.1.5"
 
 
 app = FastAPI(

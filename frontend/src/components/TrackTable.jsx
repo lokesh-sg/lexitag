@@ -14,6 +14,7 @@ const ALL_COLUMNS = [
   { key: 'album', label: 'Album', cls: 'flex-[1.5]', minWidth: '140px' },
   { key: 'genre', label: 'Genre', cls: 'flex-1', minWidth: '100px' },
   { key: 'year', label: 'Year', cls: 'w-16' },
+  { key: 'language', label: 'Language', cls: 'w-20', minWidth: '90px' },
   { key: 'composer', label: 'Composer', cls: 'flex-1', minWidth: '120px' },
   { key: 'duration', label: 'Time', cls: 'w-16' },
   { key: 'bitrate', label: 'Kbps', cls: 'w-16' },
@@ -25,7 +26,7 @@ const ALL_COLUMNS = [
   { key: 'last_fixed_at', label: 'Status/Fixed', cls: 'w-32' },
 ];
 
-const DEFAULT_COLUMNS = ['title', 'artist', 'album', 'genre', 'composer', 'duration', 'last_fixed_at'];
+const DEFAULT_COLUMNS = ['title', 'artist', 'album', 'genre', 'language', 'composer', 'duration', 'last_fixed_at'];
 
 export default function TrackTable({
   tracks, loading, selected, onSelect, onSelectAll,
@@ -51,6 +52,7 @@ export default function TrackTable({
         album: 180,
         genre: 120,
         year: 80,
+        language: 100,
         composer: 150,
         duration: 80,
         bitrate: 80,

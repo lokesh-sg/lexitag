@@ -1,6 +1,6 @@
 # LexiTag
 
-**Version:** 0.1.4 | **Language:** Python 3.12 / React 18 | **Database:** SQLite
+**Version:** 0.1.5 | **Language:** Python 3.12 / React 18 | **Database:** SQLite
 
 LexiTag is a self-hosted music library metadata manager. It scans your audio files, cleans junk metadata, enriches tags using an AI model, fetches lyrics, and provides a web-based UI for browsing and editing your entire library. Everything runs locally — no cloud sync required.
 
@@ -62,7 +62,9 @@ LexiTag is a self-hosted music library metadata manager. It scans your audio fil
 - Indexes files by scanning configured source directories.
 - Supports multiple library sources with independent enabled/disabled toggles per source.
 - Only enabled sources are scanned — useful when migrating between drives or directories.
-- Filters available: Missing Tags, Missing Lyrics, Missing Language, Has Junk, and more.
+- Customizable Table Columns: Toggle on/off, resize, and re-order columns (Title, Artist, Album, Genre, Language, Year, Composer, Time, Kbps, Type, Comment, Filename, Path, Scanned, Status/Fixed).
+- Column Sorting: Sort tracks by Title, Artist, Album, Genre, Language, Year, Duration, Kbps, and more.
+- Filters available: All, Missing Lyrics, Has Junk, Missing Language, Untouched, Local Fixed, AI Optimized.
 
 ### Batch Fix
 - Select any number of tracks and run an AI fix, lyrics-only fix, local-only fix, or filename fix.
@@ -291,6 +293,12 @@ The batch engine retries on API failures and soft-skips tracks the AI cannot ide
 ---
 
 ## Release Notes
+
+### v0.1.5 (2026-08-21)
+- Fixed missing `language` column in background scanner SQL `INSERT` and `UPDATE` queries.
+- Enhanced multi-format language tag extraction for ID3 (`TLAN`, `TXXX:Language`), FLAC (`language`, `lang`, `tlan`), and MP4 (`\xa9lan`).
+- Added standalone **Language** column to library table UI with sorting, column manager toggling, and re-ordering support.
+- Audited and updated all frontend and backend dependencies to eliminate security vulnerabilities (0 npm audit vulnerabilities).
 
 ### v0.1.4 (2026-06-09)
 - Hardened Docker image to run securely as a non-root user (`lexitag`).

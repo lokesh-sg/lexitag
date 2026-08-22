@@ -75,11 +75,14 @@ def _get_id3_tags(audio) -> dict:
     # Composer
     if "TCOM" in id3:
         tags["composer"] = _clean_frame(id3["TCOM"])
-    # Language
-    if "TXXX:Language" in id3:
-        tags["language"] = _clean_frame(id3["TXXX:Language"])
-    elif "TLAN" in id3:
-        tags["language"] = _clean_frame(id3["TLAN"])
+    # Language: Check TLAN and TXXX:Language (case-insensitive and prefix matching)
+    for key in id3:
+        k_upper = key.upper()
+        if k_upper.startswith("TLAN") or "TXXX:LANGUAGE" in k_upper or "TXXX:LANG" in k_upper:
+            val = _clean_frame(id3[key])
+            if val and val.strip():
+                tags["language"] = val.strip()
+                break
     # Lyrics (USLT frames)
     # Check all USLT frames; prioritize those with content
     for key in id3:
@@ -154,10 +157,12 @@ def _get_flac_tags(audio: FLAC) -> dict:
             
     tags["comment"] = _safe_get("comment")
     tags["composer"] = _safe_get("composer")
-    # Language: Prioritize full name if available
-    lang_val = _safe_get("language")
-    full_lang = _safe_get("language_full")
-    tags["language"] = full_lang if full_lang and len(full_lang) > 3 else lang_val
+    # Language: Check common FLAC/Vorbis keys
+    for k in ["language", "language_full", "lang", "tlan"]:
+        val = _safe_get(k)
+        if val and val.strip():
+            tags["language"] = val.strip()
+            break
 
     return tags
 
@@ -199,11 +204,18 @@ def _get_mp4_tags(audio: MP4) -> dict:
             
     tags["comment"] = _safe_get("\xa9cmt")
     tags["composer"] = _safe_get("\xa9wrt")
-    # Language: Prioritize full name in freeform atom if available
+    # Language: Prioritize full name in freeform atom if available, fallback to \xa9lan or any lang atom
     lang_val = _safe_get("\xa9lan")
-    full_lang_raw = atoms.get("----:com.apple.iTunes:Language", [b""])[0]
-    full_lang = full_lang_raw.decode('utf-8', errors='ignore') if isinstance(full_lang_raw, bytes) else str(full_lang_raw)
-    tags["language"] = full_lang if full_lang and len(full_lang) > 3 else lang_val
+    if not lang_val:
+        for k in atoms.keys():
+            k_str = str(k).lower()
+            if "language" in k_str or "lang" in k_str:
+                val_raw = atoms[k][0] if isinstance(atoms[k], list) and len(atoms[k]) > 0 else atoms[k]
+                val_str = val_raw.decode('utf-8', errors='ignore') if isinstance(val_raw, bytes) else str(val_raw)
+                if val_str and val_str.strip():
+                    lang_val = val_str.strip()
+                    break
+    tags["language"] = lang_val
 
     return tags
 

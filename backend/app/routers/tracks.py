@@ -80,13 +80,14 @@ async def scan_library():
                     await db.execute(
                         """UPDATE tracks SET
                             filename=?, title=?, artist=?, album=?, genre=?, year=?, composer=?, comment=?,
-                            duration=?, bitrate=?, has_lyrics=?, has_junk=?, format=?, lyrics=?, last_scanned=?, is_missing=0, raw_tags_json=?
+                            duration=?, bitrate=?, has_lyrics=?, language=?, has_junk=?, format=?, lyrics=?, last_scanned=?, is_missing=0, raw_tags_json=?
                            WHERE path=?""",
                         (
                             track["filename"], track["title"], track["artist"],
                             track["album"], track["genre"], track["year"], track["composer"],
                             track.get("comment", ""),
                             track["duration"], track.get("bitrate", 0), 1 if track["has_lyrics"] else 0,
+                            track.get("language", ""),
                             1 if track["has_junk"] else 0, track["format"],
                             "", track["last_scanned"], track.get("raw_tags_json", "{}"), track["path"],
                         ),
@@ -95,13 +96,14 @@ async def scan_library():
                     await db.execute(
                         """INSERT INTO tracks
                             (path, filename, title, artist, album, genre, year, composer, comment,
-                             duration, bitrate, has_lyrics, has_junk, format, lyrics, last_scanned, is_missing, raw_tags_json)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
+                             duration, bitrate, has_lyrics, language, has_junk, format, lyrics, last_scanned, is_missing, raw_tags_json)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
                         (
                             track["path"], track["filename"], track["title"],
                             track["artist"], track["album"], track["genre"],
                             track["year"], track["composer"], track.get("comment", ""),
                             track["duration"], track.get("bitrate", 0), 1 if track["has_lyrics"] else 0,
+                            track.get("language", ""),
                             1 if track["has_junk"] else 0, track["format"], "", track["last_scanned"],
                             track.get("raw_tags_json", "{}")
                         ),
@@ -309,7 +311,7 @@ async def list_tracks(
 
     # Sanitize sort field
     allowed_sorts = {"title", "artist", "album", "genre", "year", "duration",
-                     "filename", "format", "last_scanned", "composer", 
+                     "filename", "format", "last_scanned", "composer", "language",
                      "last_fixed_at", "last_fix_type", "bitrate", "comment", "path"}
     if sort_by not in allowed_sorts:
         sort_by = "title"

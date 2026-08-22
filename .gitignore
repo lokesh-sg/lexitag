@@ -24,8 +24,10 @@ frontend/dist/
 # Data directory — contains live database and runtime logs
 data/
 
-# Build archives
-builds/*.zip
+# Build and Backup archives
+builds/
+backups/
+prod/
 
 # IDE
 .vscode/
