@@ -101,13 +101,14 @@ async def process_song_full(tags: dict, filename: str = "", parent_folder: str =
                 if "```json" in json_str:
                     json_str = json_str.replace("```json", "").replace("```", "")
             else:
-                print(f"[master_llm] No JSON braces found. Falling back to brute-force text search for '{filename}'")
+                json_str = text
+                print(f"[master_llm] No JSON braces found. Falling back to plain text/lyrics parsing for '{filename}'")
 
             try:
                 if start != -1 and end != -1:
                     result = json.loads(json_str)
                 else:
-                    raise json.JSONDecodeError("Brute-force rescue", json_str, 0)
+                    raise json.JSONDecodeError("Plain text fallback", json_str, 0)
             except (json.JSONDecodeError, Exception):
                 try:
                     meta = {}
@@ -118,14 +119,21 @@ async def process_song_full(tags: dict, filename: str = "", parent_folder: str =
                     lang_match = re.search(r'["\']?language["\']?\s*[:=]\s*["\']?([^"\',;\n]+)["\']?', json_str, re.I)
                     lyr_match = re.search(r'["\']?lyrics["\']?\s*[:=]\s*(.*)', json_str, re.S | re.I)
                     
-                    if meta.get("title") and meta.get("artist"):
-                        result = {
-                            "metadata": meta,
-                            "language": lang_match.group(1).strip().rstrip('",. \t') if lang_match else "Undetermined",
-                            "lyrics": lyr_match.group(1).split("}", 1)[0].replace('\\n', '\n').strip(' \n\t"\'') if lyr_match else ""
-                        }
-                    else:
-                        raise RuntimeError("LLM provided no identifiable metadata blocks.")
+                    # If LLM returned text (likely lyrics) without a JSON block, construct a valid result using existing tags & text
+                    lyrics_text = text if start == -1 else (lyr_match.group(1).split("}", 1)[0].replace('\\n', '\n').strip(' \n\t"\'') if lyr_match else "")
+                    
+                    result = {
+                        "metadata": {
+                            "title": meta.get("title") or tags.get("title", ""),
+                            "artist": meta.get("artist") or tags.get("artist", ""),
+                            "album": meta.get("album") or tags.get("album", ""),
+                            "genre": meta.get("genre") or tags.get("genre", ""),
+                            "year": meta.get("year") or tags.get("year", ""),
+                            "composer": meta.get("composer") or tags.get("composer", ""),
+                        },
+                        "language": lang_match.group(1).strip().rstrip('",. \t') if lang_match else (tags.get("language") or "Undetermined"),
+                        "lyrics": lyrics_text
+                    }
                 except Exception as e:
                     raise RuntimeError(f"LLM parsing failed: {e}")
             

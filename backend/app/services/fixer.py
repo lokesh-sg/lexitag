@@ -150,9 +150,13 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
                 return {"success": False, "error": str(e)}
             
             discovery_result = master_result.get("metadata", {})
-            # Merge AI results OVER local pre-cleaned results
-            current_result = dict(pre_cleaned_tags)
-            current_result.update(discovery_result)
+            # Merge AI results OVER local pre-cleaned results safely:
+            # Only update fields if the AI provided a non-empty value!
+            current_result = dict(pre_cleaned_original)
+            current_result.update(pre_cleaned_tags)
+            for k, v in discovery_result.items():
+                if v and str(v).strip():
+                    current_result[k] = v
             
             # CRITICAL: Re-clean AFTER the AI merge! 
             # This prevents the AI from re-injecting junk it found during its search.
