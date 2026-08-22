@@ -68,6 +68,7 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
             "year": file_data.get("year", ""),
             "comment": file_data.get("comment", ""),
             "lyrics": file_data.get("lyrics", ""),
+            "language": file_data.get("language", ""),
             "composer": file_data.get("composer", ""),
         }
         
