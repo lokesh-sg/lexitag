@@ -55,9 +55,27 @@ archive:
 		-x "prod/__pycache__/*" && \
 	echo "📁 Archive created: builds/lexitag-v$$VERSION.zip"
 
-## docker-build: Build Docker image
+## docker-build: Build Docker image locally
 docker-build:
 	docker compose build
+
+## docker-build-amd64: Build amd64 image, save timestamped tarball, and copy to /Volumes/Downloads-1/LexiTag/
+docker-build-amd64:
+	@TS=$$(date +%Y%m%d_%H%M); \
+	VER=$$(cat $(VERSION_FILE)); \
+	DEST="/Volumes/Downloads-1/LexiTag"; \
+	echo "🐳 Building linux/amd64 image for v$$VER (Build $$TS)..."; \
+	docker buildx build --platform linux/amd64 -t lokeshsg/lexitag:v$$VER -t lokeshsg/lexitag:latest -t lokeshsg/lexitag:prod --load . && \
+	mkdir -p backups && \
+	echo "📦 Exporting timestamped tarball: backups/lexitag_v$${VER}_$${TS}_amd64.tar..." && \
+	docker save -o "backups/lexitag_v$${VER}_$${TS}_amd64.tar" lokeshsg/lexitag:v$$VER lokeshsg/lexitag:latest lokeshsg/lexitag:prod && \
+	if [ -d "$$DEST" ]; then \
+		echo "🚀 Copying to $$DEST..."; \
+		cp "backups/lexitag_v$${VER}_$${TS}_amd64.tar" "$$DEST/lexitag_v$${VER}_$${TS}_amd64.tar"; \
+		cp "backups/lexitag_v$${VER}_$${TS}_amd64.tar" "$$DEST/lexitag_v$${VER}_latest_amd64.tar"; \
+		cp "backups/lexitag_v$${VER}_$${TS}_amd64.tar" "$$DEST/lexitag_v$${VER}_amd64.tar"; \
+		echo "✅ Successfully deployed to $$DEST"; \
+	fi
 
 ## docker-up: Start the stack
 docker-up:
