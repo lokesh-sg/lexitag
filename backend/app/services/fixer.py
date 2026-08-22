@@ -358,16 +358,46 @@ async def revert_track(history_id: int) -> dict:
     db = await get_db()
     cursor = await db.execute("SELECT * FROM tag_history WHERE id = ?", (history_id,))
     row = await cursor.fetchone()
-    if not row or row["reverted"]: return {"success": False, "error": "Invalid history entry"}
+    if not row or row["reverted"]:
+        return {"success": False, "error": "Invalid or already reverted history entry"}
 
     track_path = row["track_path"]
-    original_tags = json.loads(row["original_tags"])
-    lyrics = original_tags.pop("lyrics", "")
-    if not write_tags(track_path, original_tags, lyrics): return {"success": False, "error": "Revert failed"}
+    original_tags = json.loads(row["original_tags"] or "{}")
+    raw_before = json.loads(row["raw_before"] or "{}")
 
+    lyrics = original_tags.pop("lyrics", "")
+    language = original_tags.pop("language", "")
+
+    # Write original tags, lyrics, language, and raw_before back to the physical audio file
+    if not write_tags(track_path, original_tags, lyrics=lyrics, language=language, raw_tags=raw_before):
+        return {"success": False, "error": f"Failed to write tags to file: {track_path}"}
+
+    # Mark history entry as reverted
     await db.execute("UPDATE tag_history SET reverted = 1 WHERE id = ?", (history_id,))
+
+    # Re-scan file and sync database record
     file_data = scan_file(track_path)
     if file_data:
-        await db.execute("UPDATE tracks SET title = ?, artist = ?, album = ?, genre = ?, year = ?, composer = ?, has_lyrics = ?, language = '', has_junk = ?, raw_tags_json = ?, last_scanned = ? WHERE path = ?", (file_data["title"], file_data["artist"], file_data["album"], file_data["genre"], file_data["year"], file_data["composer"], 1 if file_data["has_lyrics"] else 0, 1 if file_data["has_junk"] else 0, file_data.get("raw_tags_json", "{}"), file_data["last_scanned"], track_path))
+        await db.execute(
+            """UPDATE tracks SET
+                title = ?, artist = ?, album = ?, genre = ?, year = ?, composer = ?, comment = ?,
+                has_lyrics = ?, language = ?, has_junk = ?, raw_tags_json = ?, last_scanned = ?
+               WHERE path = ?""",
+            (
+                file_data["title"],
+                file_data["artist"],
+                file_data["album"],
+                file_data["genre"],
+                file_data["year"],
+                file_data["composer"],
+                file_data.get("comment", ""),
+                1 if file_data["has_lyrics"] else 0,
+                file_data.get("language", ""),
+                1 if file_data["has_junk"] else 0,
+                file_data.get("raw_tags_json", "{}"),
+                file_data["last_scanned"],
+                track_path
+            ),
+        )
     await db.commit()
-    return {"success": True, "message": "Reverted"}
+    return {"success": True, "message": "Reverted successfully"}

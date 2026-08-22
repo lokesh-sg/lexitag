@@ -38,6 +38,7 @@ sync-prod:
 		--exclude='music/' \
 		--exclude='prod/' \
 		--exclude='builds/' \
+		--exclude='backups/' \
 		--exclude='tests/' \
 		--exclude='.git' \
 		--exclude='.agents' \
