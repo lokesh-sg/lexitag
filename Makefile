@@ -77,6 +77,13 @@ docker-build-amd64:
 		echo "✅ Successfully deployed to $$DEST"; \
 	fi
 
+## docker-push-amd64: Build and push linux/amd64 image to Docker Hub (tagged v<VER> and latest)
+docker-push-amd64:
+	@VER=$$(cat $(VERSION_FILE)); \
+	echo "🚀 Pushing linux/amd64 image v$$VER and latest to Docker Hub..."; \
+	docker buildx build --platform linux/amd64 -t lokeshsg/lexitag:v$$VER -t lokeshsg/lexitag:latest -t lokeshsg/lexitag:prod --push . && \
+	echo "✅ Successfully pushed lokeshsg/lexitag:v$$VER and lokeshsg/lexitag:latest to Docker Hub!"
+
 ## docker-up: Start the stack
 docker-up:
 	docker compose up -d
