@@ -230,33 +230,58 @@ def _apply_id3_frames(id3: ID3, tags: dict, lyrics: str, language: str, raw_tags
             pass
 
     # 1. Apply standard mapped tags
-    if tags.get("title") is not None:
-        id3["TIT2"] = TIT2(encoding=3, text=[_flatten_tag(tags["title"])])
-    if tags.get("artist") is not None:
-        id3["TPE1"] = TPE1(encoding=3, text=[_flatten_tag(tags["artist"])])
-    if tags.get("album") is not None:
-        id3["TALB"] = TALB(encoding=3, text=[_flatten_tag(tags["album"])])
-    if tags.get("genre") is not None:
-        genres = tags["genre"]
-        if isinstance(genres, list):
-            # Mutagen's TCON text expects a list of exact strings (ID3 handles multi separator logic)
-            id3["TCON"] = TCON(encoding=3, text=[_flatten_tag(g) for g in genres])
+    if "title" in tags:
+        if tags["title"]:
+            id3["TIT2"] = TIT2(encoding=3, text=[_flatten_tag(tags["title"])])
         else:
-            # Fallback for generic string
-            id3["TCON"] = TCON(encoding=3, text=[_flatten_tag(genres)])
-    if tags.get("year") is not None:
-        id3["TDRC"] = TDRC(encoding=3, text=[_flatten_tag(tags["year"])])
-    if tags.get("composer") is not None:
-        id3["TCOM"] = TCOM(encoding=3, text=[_flatten_tag(tags["composer"])])
+            id3.delall("TIT2")
+            
+    if "artist" in tags:
+        if tags["artist"]:
+            id3["TPE1"] = TPE1(encoding=3, text=[_flatten_tag(tags["artist"])])
+        else:
+            id3.delall("TPE1")
+            
+    if "album" in tags:
+        if tags["album"]:
+            id3["TALB"] = TALB(encoding=3, text=[_flatten_tag(tags["album"])])
+        else:
+            id3.delall("TALB")
+            
+    if "genre" in tags:
+        genres = tags["genre"]
+        if genres:
+            if isinstance(genres, list):
+                id3["TCON"] = TCON(encoding=3, text=[_flatten_tag(g) for g in genres])
+            else:
+                id3["TCON"] = TCON(encoding=3, text=[_flatten_tag(genres)])
+        else:
+            id3.delall("TCON")
+
+    if "year" in tags:
+        if tags["year"]:
+            id3["TDRC"] = TDRC(encoding=3, text=[_flatten_tag(tags["year"])])
+        else:
+            id3.delall("TDRC")
+            id3.delall("TYER")
+
+    if "composer" in tags:
+        if tags["composer"]:
+            id3["TCOM"] = TCOM(encoding=3, text=[_flatten_tag(tags["composer"])])
+        else:
+            id3.delall("TCOM")
     
-    lang_code = _get_lang_code(language)
-    if language:
-        # 1. Standard: 3-letter ISO code for maximum player compatibility
-        id3["TLAN"] = TLAN(encoding=3, text=[lang_code])
-        
-        # 2. Friendly: Full word preserved in a custom frame
-        if len(language) > 3:
-            id3.add(TXXX(encoding=3, desc="Language", text=[language]))
+    if language is not None:
+        if language:
+            lang_code = _get_lang_code(language)
+            id3["TLAN"] = TLAN(encoding=3, text=[lang_code])
+            if len(language) > 3:
+                id3.add(TXXX(encoding=3, desc="Language", text=[language]))
+        else:
+            id3.delall("TLAN")
+            for k in list(id3.keys()):
+                if "TXXX" in k and "language" in k.lower():
+                    del id3[k]
     
     if lyrics is not None:
         # Update both Synchronized (SYLT) and Unsynchronized (USLT) frames.
@@ -589,35 +614,48 @@ def _write_flac(filepath: str, tags: dict, lyrics: str, language: str, raw_tags:
             pass
 
     # 1. Standard tags
-    if tags.get("title") is not None: audio["title"] = _flatten_tag(tags["title"])
-    if tags.get("artist") is not None: audio["artist"] = _flatten_tag(tags["artist"])
-    if tags.get("album") is not None: audio["album"] = _flatten_tag(tags["album"])
-    if tags.get("genre") is not None:
+    if "title" in tags:
+        if tags["title"]: audio["title"] = _flatten_tag(tags["title"])
+        elif "title" in audio: del audio["title"]
+    if "artist" in tags:
+        if tags["artist"]: audio["artist"] = _flatten_tag(tags["artist"])
+        elif "artist" in audio: del audio["artist"]
+    if "album" in tags:
+        if tags["album"]: audio["album"] = _flatten_tag(tags["album"])
+        elif "album" in audio: del audio["album"]
+    if "genre" in tags:
         genres = tags["genre"]
-        if isinstance(genres, list):
-            # FLAC uses list natively for multi-tags
-            audio["genre"] = [_flatten_tag(g) for g in genres]
-        else:
-            audio["genre"] = [_flatten_tag(genres)]
-    if tags.get("year") is not None: audio["date"] = _flatten_tag(tags["year"])
-    if tags.get("composer") is not None: audio["composer"] = _flatten_tag(tags["composer"])
-    lang_code = _get_lang_code(language)
+        if genres:
+            if isinstance(genres, list):
+                audio["genre"] = [_flatten_tag(g) for g in genres]
+            else:
+                audio["genre"] = [_flatten_tag(genres)]
+        elif "genre" in audio: del audio["genre"]
+    if "year" in tags:
+        if tags["year"]: audio["date"] = _flatten_tag(tags["year"])
+        elif "date" in audio: del audio["date"]
+    if "composer" in tags:
+        if tags["composer"]: audio["composer"] = _flatten_tag(tags["composer"])
+        elif "composer" in audio: del audio["composer"]
     if language is not None:
-        # 1. Standard: 3-letter code
-        audio["language"] = lang_code
-        # 2. Friendly: Full word
-        if len(language) > 3:
-            audio["language_full"] = _flatten_tag(language)
+        if language:
+            lang_code = _get_lang_code(language)
+            audio["language"] = lang_code
+            if len(language) > 3:
+                audio["language_full"] = _flatten_tag(language)
+        else:
+            for k in ["language", "language_full"]:
+                if k in audio: del audio[k]
     
     if lyrics is not None:
-        # User requested strictly 'LYRICS' (all caps).
         for k in ["lyrics", "unsyncedlyrics", "lyric"]:
             if k in audio.tags:
                 del audio.tags[k]
         if lyrics:
-            # We use the standard dict interface which mutagen handles safely
             audio.tags["LYRICS"] = lyrics
-    if tags.get("comment") is not None: audio["comment"] = _flatten_tag(tags["comment"])
+    if "comment" in tags:
+        if tags["comment"]: audio["comment"] = _flatten_tag(tags["comment"])
+        elif "comment" in audio: del audio["comment"]
 
     # 2. Raw tags (Vorbis comments are easy)
     if raw_tags:

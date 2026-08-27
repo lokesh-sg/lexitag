@@ -495,8 +495,17 @@ async def update_tracks(update: TrackUpdateModel):
             
             if new_data:
                 # Update tracks table with fresh scan data
-                # PRIORITIZE update.tags/lyrics/language over re-scan for standard fields
-                # to avoid issues where re-scan fails to read back tags immediately after write.
+                # Respect explicit empty string "" deletions passed by the user
+                final_title = update.tags["title"] if ("title" in update.tags and update.tags["title"] is not None) else (new_data.get("title") or original_tags["title"])
+                final_artist = update.tags["artist"] if ("artist" in update.tags and update.tags["artist"] is not None) else (new_data.get("artist") or original_tags["artist"])
+                final_album = update.tags["album"] if ("album" in update.tags and update.tags["album"] is not None) else (new_data.get("album") or original_tags["album"])
+                final_genre = update.tags["genre"] if ("genre" in update.tags and update.tags["genre"] is not None) else (new_data.get("genre") or original_tags["genre"])
+                final_year = update.tags["year"] if ("year" in update.tags and update.tags["year"] is not None) else (new_data.get("year") or original_tags["year"])
+                final_composer = update.tags["composer"] if ("composer" in update.tags and update.tags["composer"] is not None) else (new_data.get("composer") or original_tags["composer"])
+                final_comment = update.tags["comment"] if ("comment" in update.tags and update.tags["comment"] is not None) else (new_data.get("comment") or original_tags["comment"])
+                final_lang = target_lang if target_lang is not None else (new_data.get("language") or original_tags["language"])
+                has_lyr = 1 if (target_lyrics and target_lyrics.strip()) else 0
+
                 await db.execute(
                     """UPDATE tracks SET
                         title=?, artist=?, album=?, genre=?, year=?, composer=?, comment=?,
@@ -507,16 +516,16 @@ async def update_tracks(update: TrackUpdateModel):
                         last_fixed_at=?
                        WHERE id=?""",
                     (
-                        update.tags.get("title") or new_data.get("title") or original_tags["title"],
-                        update.tags.get("artist") or new_data.get("artist") or original_tags["artist"],
-                        update.tags.get("album") or new_data.get("album") or original_tags["album"],
-                        update.tags.get("genre") or new_data.get("genre") or original_tags["genre"],
-                        update.tags.get("year") or new_data.get("year") or original_tags["year"],
-                        update.tags.get("composer") or new_data.get("composer") or original_tags["composer"],
-                        update.tags.get("comment") or new_data.get("comment") or original_tags["comment"],
-                        1 if (target_lyrics or new_data.get("has_lyrics")) else 0,
+                        final_title,
+                        final_artist,
+                        final_album,
+                        final_genre,
+                        final_year,
+                        final_composer,
+                        final_comment,
+                        has_lyr,
                         "", # Lyrics are not stored in database
-                        target_lang or new_data.get("language") or original_tags["language"],
+                        final_lang,
                         1 if new_data.get("has_junk", False) else 0,
                         new_data.get("bitrate", row["bitrate"]),
                         new_data.get("last_scanned", timestamp),
@@ -527,23 +536,25 @@ async def update_tracks(update: TrackUpdateModel):
                 )
             else:
                 # Fallback: update DB with request data even if re-scan failed
+                final_title = update.tags["title"] if ("title" in update.tags and update.tags["title"] is not None) else original_tags["title"]
+                final_artist = update.tags["artist"] if ("artist" in update.tags and update.tags["artist"] is not None) else original_tags["artist"]
+                final_album = update.tags["album"] if ("album" in update.tags and update.tags["album"] is not None) else original_tags["album"]
+                final_genre = update.tags["genre"] if ("genre" in update.tags and update.tags["genre"] is not None) else original_tags["genre"]
+                final_year = update.tags["year"] if ("year" in update.tags and update.tags["year"] is not None) else original_tags["year"]
+                final_composer = update.tags["composer"] if ("composer" in update.tags and update.tags["composer"] is not None) else original_tags["composer"]
+                final_comment = update.tags["comment"] if ("comment" in update.tags and update.tags["comment"] is not None) else original_tags["comment"]
+                final_lang = target_lang if target_lang is not None else original_tags["language"]
+                has_lyr = 1 if (target_lyrics and target_lyrics.strip()) else 0
+
                 await db.execute(
                     """UPDATE tracks SET
                         title=?, artist=?, album=?, genre=?, year=?, composer=?, comment=?,
-                        language=?, local_fix_count = local_fix_count + 1,
+                        language=?, has_lyrics=?, local_fix_count = local_fix_count + 1,
                         last_fix_type='manual', last_fixed_at=?
                        WHERE id=?""",
                     (
-                        update.tags.get("title", original_tags["title"]),
-                        update.tags.get("artist", original_tags["artist"]),
-                        update.tags.get("album", original_tags["album"]),
-                        update.tags.get("genre", original_tags["genre"]),
-                        update.tags.get("year", original_tags["year"]),
-                        update.tags.get("composer", original_tags["composer"]),
-                        update.tags.get("comment", original_tags["comment"]),
-                        target_lang or original_tags["language"],
-                        timestamp,
-                        track_id
+                        final_title, final_artist, final_album, final_genre, final_year,
+                        final_composer, final_comment, final_lang, has_lyr, timestamp, track_id
                     )
                 )
             updated.append(track_id)
@@ -791,10 +802,20 @@ async def get_track_lyrics(track_id: int):
             try:
                 ct = json.loads(h["changed_tags"]) if h["changed_tags"] else {}
                 ot = json.loads(h["original_tags"]) if h["original_tags"] else {}
-                l = ct.get("lyrics") or ot.get("lyrics")
-                if l and l.strip() and "LYRICS_NOT_FOUND" not in l:
-                    lyrics = l.strip()
-                    break
+                if "lyrics" in ct:
+                    val = ct["lyrics"]
+                    if val == "" or val is None:
+                        # User explicitly cleared lyrics in latest edit
+                        lyrics = ""
+                        break
+                    elif val and val.strip() and "LYRICS_NOT_FOUND" not in val:
+                        lyrics = val.strip()
+                        break
+                elif "lyrics" in ot:
+                    val = ot["lyrics"]
+                    if val and val.strip() and "LYRICS_NOT_FOUND" not in val:
+                        lyrics = val.strip()
+                        break
             except Exception:
                 pass
 
