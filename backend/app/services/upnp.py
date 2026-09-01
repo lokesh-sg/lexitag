@@ -20,14 +20,11 @@ logger = logging.getLogger(__name__)
 _renderers: dict[str, dict] = {}
 
 
-class TripleShieldRequester(UpnpRequester):
+class RobustRawRequester(UpnpRequester):
     """
-    Standard-compliant HTTP requester using a 3-tier fallback strategy:
-      1. HTTP/1.1 via http.client
-      2. HTTP/1.0 via http.client
-      3. Raw TCP socket HTTP/1.0 with Connection: close
-    Guarantees 100% compatibility with embedded UPnP/OpenHome micro-servers
-    (such as npupnp, libupnp, upmpdcli, and RoPieee streamers).
+    High-performance, reliable HTTP requester tailored for UPnP and OpenHome devices.
+    Uses direct TCP stream with strict 'Connection: close' semantics, guaranteeing
+    compatibility with micro-servers like upmpdcli, npupnp, libupnp, GUPnP, and smart TVs.
     """
 
     def __init__(self, timeout: int = 8, http_headers: Optional[Mapping[str, str]] = None):
@@ -35,7 +32,7 @@ class TripleShieldRequester(UpnpRequester):
         self._timeout = timeout
         self._headers = dict(http_headers or {})
 
-    def _sync_http_request(self, http_request: HttpRequest, attempt: int = 0) -> HttpResponse:
+    def _sync_http_request(self, http_request: HttpRequest) -> HttpResponse:
         parsed = urllib.parse.urlparse(http_request.url)
         host = parsed.hostname or "localhost"
         port = parsed.port or 80
@@ -46,11 +43,12 @@ class TripleShieldRequester(UpnpRequester):
         headers = {
             "User-Agent": "LexiTag/0.1.7 UPnP/1.1",
             "Accept": "*/*",
+            "Connection": "close",
             **self._headers,
             **(http_request.headers or {})
         }
 
-        data = None
+        data = b""
         if http_request.body:
             if isinstance(http_request.body, str):
                 data = http_request.body.encode("utf-8")
@@ -58,60 +56,45 @@ class TripleShieldRequester(UpnpRequester):
                 data = http_request.body
             headers["Content-Length"] = str(len(data))
 
-        # Attempt 2: Direct raw socket HTTP/1.0
-        if attempt == 2:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(self._timeout)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(self._timeout)
+        try:
             s.connect((host, port))
-            req_lines = [f"{http_request.method} {path} HTTP/1.0", f"Host: {host}:{port}"]
+            lines = [f"{http_request.method} {path} HTTP/1.1", f"Host: {host}:{port}"]
             for k, v in headers.items():
                 if k.lower() != "host":
-                    req_lines.append(f"{k}: {v}")
-            req_lines.append("Connection: close\r\n")
-            raw_req = "\r\n".join(req_lines).encode("utf-8")
-            if data:
-                raw_req += data
-            s.sendall(raw_req)
+                    lines.append(f"{k}: {v}")
+            req_bytes = "\r\n".join(lines).encode("utf-8") + b"\r\n\r\n" + data
+            s.sendall(req_bytes)
 
-            resp_data = b""
+            chunks = []
             while True:
                 chunk = s.recv(4096)
                 if not chunk:
                     break
-                resp_data += chunk
+                chunks.append(chunk)
+        finally:
             s.close()
 
-            header_part, _, body_part = resp_data.partition(b"\r\n\r\n")
-            header_lines = header_part.decode("utf-8", errors="replace").split("\r\n")
-            status_line = header_lines[0] if header_lines else "HTTP/1.0 200 OK"
-            status_parts = status_line.split(" ")
-            status_code = int(status_parts[1]) if len(status_parts) > 1 and status_parts[1].isdigit() else 200
-            resp_headers = {}
-            for line in header_lines[1:]:
-                if ":" in line:
-                    hk, hv = line.split(":", 1)
-                    resp_headers[hk.strip()] = hv.strip()
-            return HttpResponse(status_code, resp_headers, body_part.decode("utf-8", errors="replace"))
-
-        conn = http.client.HTTPConnection(host, port, timeout=self._timeout)
-        if attempt == 1:
-            conn._http_vsn = 10
-            conn._http_vsn_str = "HTTP/1.0"
-
-        try:
-            conn.request(http_request.method, path, body=data, headers=headers)
-            resp = conn.getresponse()
-            body = resp.read().decode("utf-8", errors="replace")
-            resp_headers = dict(resp.getheaders())
-            return HttpResponse(resp.status, resp_headers, body)
-        finally:
-            conn.close()
+        full_resp = b"".join(chunks)
+        header_part, _, body_part = full_resp.partition(b"\r\n\r\n")
+        header_lines = header_part.decode("utf-8", errors="replace").split("\r\n")
+        status_line = header_lines[0] if header_lines else "HTTP/1.1 200 OK"
+        status_parts = status_line.split(" ")
+        status_code = int(status_parts[1]) if len(status_parts) > 1 and status_parts[1].isdigit() else 200
+        resp_headers = {}
+        for line in header_lines[1:]:
+            if ":" in line:
+                hk, hv = line.split(":", 1)
+                resp_headers[hk.strip()] = hv.strip()
+        body = body_part.decode("utf-8", errors="replace")
+        return HttpResponse(status_code, resp_headers, body)
 
     async def async_http_request(self, http_request: HttpRequest) -> HttpResponse:
         max_attempts = 3
         for attempt in range(max_attempts):
             try:
-                return await asyncio.to_thread(self._sync_http_request, http_request, attempt)
+                return await asyncio.to_thread(self._sync_http_request, http_request)
             except Exception as err:
                 if attempt == max_attempts - 1:
                     logger.warning(
@@ -123,8 +106,8 @@ class TripleShieldRequester(UpnpRequester):
 
 
 def _get_factory(timeout: int = 8) -> UpnpFactory:
-    """Create a non-strict UpnpFactory configured with TripleShieldRequester."""
-    requester = TripleShieldRequester(timeout=timeout)
+    """Create a non-strict UpnpFactory configured with RobustRawRequester."""
+    requester = RobustRawRequester(timeout=timeout)
     return UpnpFactory(requester, non_strict=True)
 
 
@@ -154,7 +137,7 @@ async def discover_renderers(timeout: int = 5) -> list[dict]:
         if not location or location in seen_locations or location in [r["location"] for r in _renderers.values()]:
             return
 
-        # Shield against parallel SSDP response floods
+        # Shield against duplicate parallel SSDP packets
         seen_locations.add(location)
 
         logger.debug(f"Parsing UPnP/OpenHome device at: {location}")
