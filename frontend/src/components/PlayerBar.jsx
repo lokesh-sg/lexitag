@@ -283,8 +283,7 @@ export default function PlayerBar() {
               )}
               <button
                 onClick={() => setShowCast(true)}
-                disabled={!currentTrack}
-                className={`p-1.5 rounded-md transition-all disabled:opacity-25 disabled:cursor-not-allowed ${isCasting ? 'text-amber-400 bg-amber-400/10' : 'text-ink-faint hover:text-amber-400 hover:bg-surface-3/60'}`}
+                className={`p-1.5 rounded-md transition-all ${isCasting ? 'text-amber-400 bg-amber-400/10' : 'text-ink-faint hover:text-amber-400 hover:bg-surface-3/60'}`}
                 title={isCasting ? `Casting to ${activeRenderer?.name}` : "Cast to UPnP device"}
                 id="cast-btn"
               >
@@ -298,8 +297,8 @@ export default function PlayerBar() {
         </div>
       </div>
 
-      {showCast && currentTrack && (
-        <CastModal trackId={currentTrack.id} onClose={() => setShowCast(false)} />
+      {showCast && (
+        <CastModal trackId={currentTrack?.id} onClose={() => setShowCast(false)} />
       )}
 
       {showDetails && currentTrack && (

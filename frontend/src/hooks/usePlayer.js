@@ -160,7 +160,6 @@ export function usePlayer() {
     }, [repeatMode, next]);
 
     const startCast = useCallback(async (renderer) => {
-        if (!currentTrack) return;
         try {
             // 1. Set state
             setIsCasting(true);
@@ -172,12 +171,15 @@ export function usePlayer() {
                 audioRef.current.src = "";
             }
 
-            // 3. Trigger remote play
-            await castToRenderer(renderer.udn, currentTrack.id);
-            setIsPlaying(true);
+            // 3. Trigger remote play if track is already loaded
+            if (currentTrack) {
+                await castToRenderer(renderer.udn, currentTrack.id);
+                setIsPlaying(true);
+            }
         } catch (err) {
             console.error('Cast Error:', err);
             setIsCasting(false);
+            setActiveRenderer(null);
         }
     }, [currentTrack]);
 
