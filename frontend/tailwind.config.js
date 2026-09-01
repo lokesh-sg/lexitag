@@ -16,12 +16,12 @@ export default {
           4:   '#303036',  // hover states
           5:   '#3a3a42',  // borders, dividers
         },
-        // Text hierarchy
+        // Text hierarchy — optimized for crisp brightness & high contrast
         ink: {
-          rich:    '#f0ece4',  // primary text, warm white
-          normal:  '#b8b2a7',  // secondary
-          muted:   '#7d7870',  // tertiary
-          faint:   '#514d47',  // disabled
+          rich:    '#fcfbf9',  // primary text, ultra-clean brilliant warm white
+          normal:  '#dedad2',  // secondary, clear bright warm slate
+          muted:   '#a8a299',  // tertiary/metadata, distinct high-contrast grey
+          faint:   '#78736a',  // subtle/subtitles, elevated for readability
         },
         // Accent — warm amber/gold (vacuum tube glow)
         amber: {

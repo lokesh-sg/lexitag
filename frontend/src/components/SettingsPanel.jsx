@@ -23,7 +23,9 @@ import {
   fetchSystemLogs,
   toggleDebugLogging,
   clearSystemLogs,
-  getLogsDownloadUrl
+  getLogsDownloadUrl,
+  fetchAutoScanSettings,
+  updateAutoScanSettings
 } from '../api';
 
 export default function SettingsPanel({ visible, onClose }) {
@@ -38,6 +40,18 @@ export default function SettingsPanel({ visible, onClose }) {
   const [cleanupPatterns, setCleanupPatterns] = useState([]);
   const [cleanupSuggestions, setCleanupSuggestions] = useState([]);
   const [newPattern, setNewPattern] = useState({ pattern: '', category: 'junk', is_regex: false });
+  
+  // Auto-Scan Scheduler State
+  const [autoScan, setAutoScan] = useState({
+    enabled: false,
+    interval: '24h',
+    custom_minutes: 60,
+    interval_seconds: 86400,
+    last_scan: null,
+    next_scan_in_seconds: null,
+    is_scanning: false
+  });
+  const [autoScanSaving, setAutoScanSaving] = useState(false);
   
   const [logs, setLogs] = useState([]);
   const [logLevel, setLogLevel] = useState('INFO');
@@ -106,17 +120,21 @@ export default function SettingsPanel({ visible, onClose }) {
     setLoading(true);
     setFormError(null);
     try {
-      const [provData, sourcesData, cleanupData, suggestionsData] = await Promise.all([
+      const [provData, sourcesData, cleanupData, suggestionsData, autoScanData] = await Promise.all([
         fetchProviders(),
         fetchLibrarySources(),
         fetchCleanupPatterns(),
-        fetchCleanupSuggestions()
+        fetchCleanupSuggestions(),
+        fetchAutoScanSettings().catch(() => null)
       ]);
-      setProviders(provData.providers || []);
-      setPresets(provData.presets || {});
-      setSources(sourcesData.sources || []);
-      setCleanupPatterns(cleanupData.patterns || []);
-      setCleanupSuggestions(suggestionsData.suggestions || []);
+      setProviders(provData?.providers || []);
+      setPresets(provData?.presets || {});
+      setSources(sourcesData?.sources || []);
+      setCleanupPatterns(cleanupData?.patterns || []);
+      setCleanupSuggestions(suggestionsData?.suggestions || []);
+      if (autoScanData) {
+        setAutoScan(autoScanData);
+      }
       loadQuota();
     } catch (err) {
       setError('Failed to load settings');
@@ -124,6 +142,56 @@ export default function SettingsPanel({ visible, onClose }) {
       setLoading(false);
     }
   }
+
+  const handleToggleAutoScan = async (enabled) => {
+    setAutoScanSaving(true);
+    try {
+      const updated = await updateAutoScanSettings({
+        enabled,
+        interval: autoScan.interval,
+        custom_minutes: autoScan.custom_minutes
+      });
+      setAutoScan(updated);
+    } catch (err) {
+      setError('Failed to update auto-scan schedule');
+    } finally {
+      setAutoScanSaving(false);
+    }
+  };
+
+  const handleAutoScanIntervalChange = async (interval) => {
+    setAutoScanSaving(true);
+    try {
+      const updated = await updateAutoScanSettings({
+        enabled: autoScan.enabled,
+        interval,
+        custom_minutes: autoScan.custom_minutes
+      });
+      setAutoScan(updated);
+    } catch (err) {
+      setError('Failed to update interval');
+    } finally {
+      setAutoScanSaving(false);
+    }
+  };
+
+  const handleAutoScanCustomMinutesChange = async (minutes) => {
+    const mins = Math.max(1, parseInt(minutes) || 1);
+    setAutoScan(prev => ({ ...prev, custom_minutes: mins }));
+    setAutoScanSaving(true);
+    try {
+      const updated = await updateAutoScanSettings({
+        enabled: autoScan.enabled,
+        interval: 'custom',
+        custom_minutes: mins
+      });
+      setAutoScan(updated);
+    } catch (err) {
+      setError('Failed to update custom minutes');
+    } finally {
+      setAutoScanSaving(false);
+    }
+  };
 
   const handleAddSource = async () => {
     if (!newSourcePath.trim()) return;
@@ -422,6 +490,98 @@ export default function SettingsPanel({ visible, onClose }) {
                 Enabled sources will be visible in the Library and History. <br/>
                 Disabling a source hides its tracks without deleting any data.
               </p>
+
+              {/* Automated Library Scanner Section */}
+              <div className="mt-8 pt-6 border-t border-surface-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                  <div className="flex flex-col">
+                    <label className="block text-xs font-bold text-ink-rich uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      Periodic Library Auto-Scan
+                    </label>
+                    <span className="text-[10px] text-ink-muted mt-0.5">
+                      Automatically scan and sync music directories in the background on a schedule
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {autoScan.enabled && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 border border-amber-400/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        {autoScan.next_scan_in_seconds !== null ? (
+                          `Next in: ${
+                            autoScan.next_scan_in_seconds >= 3600 
+                              ? `${Math.floor(autoScan.next_scan_in_seconds / 3600)}h ${Math.floor((autoScan.next_scan_in_seconds % 3600) / 60)}m`
+                              : `${Math.floor(autoScan.next_scan_in_seconds / 60)}m ${autoScan.next_scan_in_seconds % 60}s`
+                          }`
+                        ) : 'Active'}
+                      </span>
+                    )}
+                    <div 
+                      onClick={() => !autoScanSaving && handleToggleAutoScan(!autoScan.enabled)}
+                      className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-200 shrink-0 ${autoScan.enabled ? 'bg-amber-400' : 'bg-surface-5'}`}
+                      title="Toggle Auto-Scan"
+                    >
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 ${autoScan.enabled ? 'left-6' : 'left-1'}`} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`p-4 rounded-xl border transition-all ${autoScan.enabled ? 'bg-surface-2 border-amber-400/30 shadow-inner' : 'bg-surface-1/50 border-surface-4 opacity-75'}`}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] text-ink-normal font-bold uppercase tracking-wider mb-1.5">
+                        Scan Frequency / Interval
+                      </label>
+                      <select
+                        value={autoScan.interval}
+                        disabled={!autoScan.enabled || autoScanSaving}
+                        onChange={(e) => handleAutoScanIntervalChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-surface-0 border border-surface-4 text-xs text-ink-rich font-medium focus:border-amber-400/50 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="1h">Every 1 Hour</option>
+                        <option value="6h">Every 6 Hours</option>
+                        <option value="12h">Every 12 Hours</option>
+                        <option value="24h">Every 24 Hours (Daily)</option>
+                        <option value="7d">Every 7 Days (Weekly)</option>
+                        <option value="custom">Custom Timing...</option>
+                      </select>
+                    </div>
+
+                    {autoScan.interval === 'custom' && (
+                      <div className="animate-fade-in">
+                        <label className="block text-[10px] text-ink-normal font-bold uppercase tracking-wider mb-1.5">
+                          Custom Interval (Minutes)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            max="10080"
+                            disabled={!autoScan.enabled || autoScanSaving}
+                            value={autoScan.custom_minutes}
+                            onChange={(e) => handleAutoScanCustomMinutesChange(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-surface-0 border border-surface-4 text-xs font-mono text-ink-rich focus:border-amber-400/50 outline-none disabled:opacity-50"
+                            placeholder="e.g. 45"
+                          />
+                          <span className="text-xs text-ink-muted font-medium whitespace-nowrap">
+                            ({autoScan.custom_minutes >= 60 ? `${(autoScan.custom_minutes / 60).toFixed(1)} hrs` : `${autoScan.custom_minutes} mins`})
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {autoScan.last_scan && (
+                    <div className="mt-3 pt-3 border-t border-surface-4/60 flex items-center justify-between text-[10px] text-ink-muted">
+                      <span>Last automated scan:</span>
+                      <span className="font-mono text-ink-normal font-medium">{new Date(autoScan.last_scan).toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Path Relocation Section — The Migration Matrix */}
               <div className="mt-8 pt-6 border-t border-surface-4">

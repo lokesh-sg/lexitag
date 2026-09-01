@@ -559,3 +559,30 @@ async def clear_system_logs():
         with open(LOG_FILE_PATH, "w", encoding="utf-8") as f:
             f.write(f"=== LexiTag System Log Reset at {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
     return {"message": "Logs cleared successfully"}
+
+
+# ── Auto-Scan Scheduler Settings ──
+
+class AutoScanConfigReq(BaseModel):
+    enabled: bool
+    interval: str = "24h"
+    custom_minutes: int | None = 60
+
+
+@router.get("/auto-scan")
+async def get_auto_scan_settings():
+    """Fetch current automated library scanner configuration and countdown status."""
+    from backend.app.services.scheduler import auto_scan_scheduler
+    return await auto_scan_scheduler.get_status()
+
+
+@router.post("/auto-scan")
+async def update_auto_scan_settings(req: AutoScanConfigReq):
+    """Update automated library scanner schedule interval and state."""
+    from backend.app.services.scheduler import auto_scan_scheduler
+    return await auto_scan_scheduler.update_config(
+        enabled=req.enabled,
+        interval=req.interval,
+        custom_minutes=req.custom_minutes
+    )
+

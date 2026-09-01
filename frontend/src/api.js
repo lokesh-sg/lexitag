@@ -335,4 +335,16 @@ export function getLogsDownloadUrl() {
     return '/api/settings/logs/download';
 }
 
+// ── Automated Library Scanner ──
+
+export async function fetchAutoScanSettings() {
+    const { data } = await api.get('/settings/auto-scan');
+    return data;
+}
+
+export async function updateAutoScanSettings(config) {
+    const { data } = await api.post('/settings/auto-scan', config);
+    return data;
+}
+
 export default api;

@@ -95,14 +95,14 @@ export default function PlayerBar() {
           {/* Hover Time Indicator (Optional but nice) */}
         </div>
 
-        <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center gap-4">
+        <div className="max-w-[1600px] mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Track info - Clickable for details */}
           <div 
-            className="flex items-center gap-3 flex-[1.5] min-w-0 cursor-pointer group/info"
+            className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0 cursor-pointer group/info"
             onClick={() => currentTrack && setShowDetails(true)}
             title="View full track details"
           >
-            <div className="w-10 h-10 rounded-lg bg-surface-3 border border-surface-5/30 flex items-center justify-center flex-shrink-0 group-hover/info:border-amber-500/50 transition-colors">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-surface-3 border border-surface-5/40 flex items-center justify-center flex-shrink-0 group-hover/info:border-amber-400/50 transition-colors">
                {currentTrack ? (
                  <img 
                     src={`/api/tracks/${currentTrack.id}/cover?t=${Date.now()}`} 
@@ -114,7 +114,7 @@ export default function PlayerBar() {
                  />
                ) : null}
               <svg 
-                className={`w-4 h-4 ${currentTrack ? (isPlaying ? 'text-amber-400' : 'text-ink-muted') : 'text-ink-faint'}`} 
+                className={`w-4 h-4 ${currentTrack ? (isPlaying ? 'text-amber-400' : 'text-ink-muted') : 'text-ink-muted'}`} 
                 viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                 style={{ display: currentTrack ? 'none' : 'block' }}
               >
@@ -125,24 +125,24 @@ export default function PlayerBar() {
             </div>
             {currentTrack ? (
               <div className="min-w-0">
-                <p className="text-sm font-medium text-ink-rich truncate group-hover/info:text-amber-400 transition-colors">
+                <p className="text-xs sm:text-sm font-semibold text-ink-rich truncate group-hover/info:text-amber-400 transition-colors">
                   {currentTrack.title || currentTrack.filename}
                 </p>
-                <p className="text-[11px] text-ink-muted truncate group-hover/info:text-ink-normal transition-colors">
+                <p className="text-[10px] sm:text-[11px] text-ink-muted truncate group-hover/info:text-ink-normal transition-colors font-medium">
                   {currentTrack.artist || 'Unknown Artist'}
                 </p>
               </div>
             ) : (
-              <p className="text-xs text-ink-faint">No track selected</p>
+              <p className="text-xs text-ink-muted">No track selected</p>
             )}
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-4 flex-2 justify-center">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0 justify-center">
             {/* Shuffle */}
             <button
                onClick={() => setShuffle(!shuffleMode)}
-               className={`p-1.5 rounded transition-colors ${shuffleMode ? 'text-amber-400' : 'text-ink-faint hover:text-ink-muted'}`}
+               className={`p-1.5 rounded transition-colors hidden sm:inline-flex ${shuffleMode ? 'text-amber-400' : 'text-ink-muted hover:text-ink-rich'}`}
                title="Shuffle"
             >
                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -157,7 +157,7 @@ export default function PlayerBar() {
                className="p-1.5 text-ink-normal hover:text-amber-400 disabled:opacity-20 transition-all"
                title="Previous"
             >
-               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+               <svg className="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="currentColor">
                   <polygon points="19,20 9,12 19,4" /><rect x="5" y="4" width="2" height="16" />
                </svg>
             </button>
@@ -166,20 +166,20 @@ export default function PlayerBar() {
             <button
               onClick={togglePlay}
               disabled={!currentTrack}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-150 ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-150 ${
                 currentTrack
                   ? 'bg-amber-400 text-surface-0 hover:bg-amber-300 active:scale-95 shadow-md hover:shadow-lg'
-                  : 'bg-surface-4 text-ink-faint cursor-not-allowed'
+                  : 'bg-surface-4 text-ink-muted cursor-not-allowed'
               }`}
               id="player-play-btn"
             >
               {isPlaying ? (
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="6" y="4" width="4" height="16" rx="1" />
                   <rect x="14" y="4" width="4" height="16" rx="1" />
                 </svg>
               ) : (
-                <svg className="w-5 h-5 ml-1" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5" viewBox="0 0 24 24" fill="currentColor">
                   <polygon points="6,3 20,12 6,21" />
                 </svg>
               )}
@@ -192,7 +192,7 @@ export default function PlayerBar() {
                className="p-1.5 text-ink-normal hover:text-amber-400 disabled:opacity-20 transition-all"
                title="Next"
             >
-               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+               <svg className="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="currentColor">
                   <polygon points="5,4 15,12 5,20" /><rect x="17" y="4" width="2" height="16" />
                </svg>
             </button>
@@ -200,7 +200,7 @@ export default function PlayerBar() {
             {/* Repeat */}
             <button
                onClick={cycleRepeat}
-               className={`p-1.5 rounded transition-colors relative ${repeatMode !== 'none' ? 'text-amber-400' : 'text-ink-faint hover:text-ink-muted'}`}
+               className={`p-1.5 rounded transition-colors relative hidden sm:inline-flex ${repeatMode !== 'none' ? 'text-amber-400' : 'text-ink-muted hover:text-ink-rich'}`}
                title={`Repeat: ${repeatMode}`}
             >
                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -215,7 +215,7 @@ export default function PlayerBar() {
             <button
                onClick={stop}
                disabled={!currentTrack}
-               className="p-1.5 text-ink-faint hover:text-red-500 disabled:opacity-20 transition-all ml-1"
+               className="p-1.5 text-ink-muted hover:text-red-500 disabled:opacity-20 transition-all ml-0.5 hidden sm:inline-flex"
                title="Stop"
             >
                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -225,18 +225,18 @@ export default function PlayerBar() {
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-3.5 flex-[1.5] justify-end">
-            <span className="text-[11px] text-ink-muted font-mono min-w-[70px] text-right tabular-nums">
+          <div className="flex items-center gap-2 sm:gap-3.5 flex-1 justify-end shrink-0">
+            <span className="text-[10px] sm:text-[11px] text-ink-normal font-mono min-w-[60px] text-right tabular-nums hidden xs:inline">
               {fmt(currentTime)} / {fmt(duration)}
             </span>
 
             {/* Volume */}
-            <div className="flex items-center gap-2 group/vol min-w-[120px]">
+            <div className="hidden md:flex items-center gap-2 group/vol min-w-[120px]">
               <button 
                 onClick={() => changeVolume(volume > 0 ? 0 : 0.8)}
                 className="p-1 px-1.5 rounded hover:bg-surface-3 transition-colors"
               >
-                <svg className="w-3.5 h-3.5 text-ink-faint group-hover/vol:text-amber-500 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="w-3.5 h-3.5 text-ink-normal group-hover/vol:text-amber-400 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M11 5L6 9H2V15H6L11 19V5Z" />
                     {volume > 0.5 ? <path d="M19.07 4.93C20.9447 6.80528 21.9979 9.34836 21.9979 12C21.9979 14.6516 20.9447 17.1947 19.07 19.07" /> : null}
                     {volume > 0 ? <path d="M15.54 8.46C16.4774 9.39764 17.004 10.6692 17.004 12C17.004 13.3308 16.4774 14.6024 15.54 15.54" /> : null}

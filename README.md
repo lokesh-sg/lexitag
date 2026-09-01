@@ -1,8 +1,8 @@
 # LexiTag
 
-**Version:** 0.1.6 | **Language:** Python 3.12 / React 18 | **Database:** SQLite
+**Version:** 0.1.7 | **Language:** Python 3.12 / React 18 | **Database:** SQLite
 
-LexiTag is a self-hosted music library metadata manager. It scans your audio files, cleans junk metadata, enriches tags using an AI model, fetches lyrics, and provides a web-based UI for browsing and editing your entire library. Everything runs locally — no cloud sync required.
+LexiTag is a self-hosted music library metadata manager. It scans your audio files, cleans junk metadata, enriches tags using an AI model, fetches lyrics, and provides a sleek, modern web-based UI for browsing and editing your entire library. Everything runs locally — no cloud sync required.
 
 ---
 
@@ -16,6 +16,7 @@ LexiTag is a self-hosted music library metadata manager. It scans your audio fil
 - [Configuration](#configuration)
 - [Ports](#ports)
 - [Authentication](#authentication)
+- [Periodic Auto-Scan Scheduler](#periodic-auto-scan-scheduler)
 - [How Tag Cleaning Works](#how-tag-cleaning-works)
 - [Multi-Provider AI Support](#multi-provider-ai-support)
 - [Audio Player](#audio-player)
@@ -292,7 +293,24 @@ The batch engine retries on API failures and soft-skips tracks the AI cannot ide
 
 ---
 
+## Periodic Auto-Scan Scheduler
+
+LexiTag features an automated background library scanner that keeps your music database synchronized with on-disk changes without manual intervention:
+- **Enable / Disable**: Toggle the automated scanner on or off directly from the **Settings → System Config** tab.
+- **Preset Timings**: Choose from standard intervals (`Every 1 Hour`, `Every 6 Hours`, `Every 12 Hours`, `Every 24 Hours (Daily)`, `Every 7 Days (Weekly)`).
+- **Custom Intervals**: Define your own custom recurring scan frequency down to the exact number of minutes or hours.
+- **Live Countdown & Status**: View the real-time countdown to the next scheduled scan and the timestamp of the last successful automated scan.
+- **Non-blocking Execution**: Auto-scans run asynchronously in the background and prevent duplicate scans if another job or manual scan is already running.
+
+---
+
 ## Release Notes
+
+### v0.1.7 (2026-09-01)
+- **Automatic Multi-Screen & Mobile Optimization**: Complete responsive redesign of navigation header, search bar, filter chips with horizontal scrolling, metadata edit modals, bottom player bar, and history views to seamlessly adapt across mobile phones, tablets, laptops, and ultra-wide displays.
+- **Enhanced Typography Brightness & Text Contrast**: Significantly boosted global text brightness, badge contrast, and input readability (`ink.rich`, `ink.normal`, `ink.muted`) for maximum visual clarity on dark background themes.
+- **Periodic Background Library Auto-Scanner**: Introduced singleton `AutoScanScheduler` background service with configurable standard presets (1h, 6h, 12h, 24h, 7d) and custom minute/hour intervals, alongside live next-scan timers in the System Config settings.
+- **Persistent Deletion Fix**: Fixed issue where manually erasing metadata tags or lyrics in the track editor was not saving the cleared state to disk tags.
 
 ### v0.1.6 (2026-08-22)
 - **Metadata Protection Engine**: Guaranteed that manual edits and existing track metadata (title, artist, album, year, composer) are never erased or blanked out during AI Fix operations.

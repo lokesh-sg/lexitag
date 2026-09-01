@@ -113,25 +113,25 @@ export default function HistoryView() {
 
   return (
     <div className="space-y-5 animate-fade-in pb-20">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex-1">
           <h2 className="text-xl font-bold text-ink-rich font-display">Change History</h2>
-          <p className="text-xs text-ink-muted mt-0.5">
+          <p className="text-xs text-ink-muted mt-0.5 font-medium">
             {total} modification{total !== 1 ? 's' : ''} recorded • {selectedIds.length} selected
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             {/* Page Size Selector */}
-            <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase text-ink-faint tracking-wider">Per Page</span>
+            <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase text-ink-muted tracking-wider">Per Page</span>
                 <select
                     value={pageSize}
                     onChange={(e) => {
                         setPageSize(Number(e.target.value));
                         setPage(1);
                     }}
-                    className="appearance-none bg-surface-2 border border-surface-4 text-ink-muted text-[10px] font-bold rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500/50 cursor-pointer transition-all"
+                    className="appearance-none bg-surface-2 border border-surface-5/50 text-ink-rich text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400/50 cursor-pointer transition-all"
                 >
                     {[25, 50, 100, 200].map(v => <option key={v} value={v}>{v}</option>)}
                 </select>
@@ -140,10 +140,10 @@ export default function HistoryView() {
             <button 
                 onClick={() => loadHistory()}
                 disabled={loading}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border border-surface-4 text-xs font-bold text-ink-muted hover:bg-surface-3 transition-all ${loading ? 'opacity-50' : 'hover:text-ink-rich hover:border-amber-500/30 shadow-sm'}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-5/50 text-xs font-bold text-ink-normal hover:bg-surface-3 transition-all ${loading ? 'opacity-50' : 'hover:text-ink-rich hover:border-amber-400/30 shadow-sm'}`}
                 title="Refresh History"
             >
-                <svg className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-500' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-400' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M23 4v6h-6" />
                     <path d="M1 20v-6h6" />
                     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
@@ -156,19 +156,19 @@ export default function HistoryView() {
                  <button 
                     onClick={() => setConfirmingAction({ type: 'bulk' })}
                     disabled={batchActionRunning}
-                    className="btn-danger !py-1.5 !px-4 text-xs shadow-lg shadow-fn-danger/20"
+                    className="btn-danger !py-1.5 !px-3 text-xs shadow-lg shadow-fn-danger/20"
                  >
                     Revert Selected ({selectedIds.length})
                  </button>
-                 <button onClick={() => setSelectedIds([])} className="text-xs text-ink-faint hover:text-ink-normal">Cancel</button>
+                 <button onClick={() => setSelectedIds([])} className="text-xs text-ink-muted hover:text-ink-rich font-medium">Cancel</button>
               </div>
             )}
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative group flex-1 max-w-md">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint group-focus-within:text-amber-500 transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative group flex-1 max-w-md w-full">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted group-focus-within:text-amber-400 transition-colors">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             </div>
             <input 
@@ -176,12 +176,12 @@ export default function HistoryView() {
                 placeholder="Search history..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full bg-surface-2 border border-surface-4 rounded-xl pl-10 pr-10 py-2.5 text-sm text-ink-normal outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all"
+                className="w-full bg-surface-2 border border-surface-5/50 rounded-xl pl-10 pr-10 py-2 text-xs sm:text-sm text-ink-rich outline-none focus:ring-1 focus:ring-amber-400/50 focus:border-amber-400/50 transition-all font-medium"
             />
             {search && (
                 <button 
                     onClick={() => setSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-surface-4 rounded-full text-ink-faint hover:text-ink-normal transition-all"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-surface-4 rounded-full text-ink-muted hover:text-ink-rich transition-all"
                 >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
                 </button>
@@ -189,7 +189,7 @@ export default function HistoryView() {
         </div>
 
         {total > pageSize && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 self-end sm:self-auto">
                 <button onClick={() => setPage(1)} disabled={page <= 1} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">First</button>
                 <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page <= 1} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">←</button>
                 <div className="px-3 py-1 rounded-lg bg-surface-3 border border-surface-4 text-[10px] font-black text-amber-500 tabular-nums">

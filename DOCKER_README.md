@@ -1,4 +1,4 @@
-# LexiTag (v0.1.6)
+# LexiTag (v0.1.7)
 
 **Intelligent Music Metadata Manager with AI-Powered Junk Discovery**
 
@@ -32,11 +32,13 @@ services:
 
 ## 🛠 Key Features
 
+- **Automatic Multi-Screen & Mobile Optimization**: Seamlessly responsive UI across mobile phones, tablets, laptops, and ultra-wide displays.
+- **Periodic Library Auto-Scanner**: Configurable background auto-sync scheduler with preset standard frequencies (1h, 6h, 12h, 24h, 7d) and custom minute/hour intervals.
+- **Enhanced High-Contrast Dark Theme**: High-visibility typography and bright text hierarchy for readability.
 - **AI-Powered Tag & Lyrics Enrichment**: Uses Gemini Google Search Grounding to clean titles, artists, albums, genres, release years, and fetch full lyrics (including regional & Tamil songs).
 - **Metadata Protection & Revert System**: Retains manual edits during scans and provides 1-click backwards history restoration across all audio formats.
 - **Multi-Format Audio Support**: Full ID3, Vorbis, MP4 atom, and WAV RIFF tag scanning & writing for MP3, FLAC, M4A, and WAV files.
 - **System Logs & Live Debug Mode**: Interactive terminal viewer, runtime log level toggle, and direct log file download directly from the browser UI.
-- **Auto-Junk Discovery Engine**: Automatically detects site-specific promo junk, website URLs, and unwanted comments during library scans.
 
 ---
 

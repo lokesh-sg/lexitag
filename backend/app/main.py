@@ -64,7 +64,15 @@ async def lifespan(app: FastAPI):
     logger.info("Database initialized")
     from backend.app.security import migrate_unencrypted_keys
     await migrate_unencrypted_keys()
+    
+    # Initialize and start periodic auto-scan background scheduler
+    from backend.app.services.scheduler import auto_scan_scheduler
+    auto_scan_scheduler.start()
+    
     yield
+    
+    # Stop background scheduler and close DB
+    auto_scan_scheduler.stop()
     await close_db()
     logger.info("Database closed")
 
@@ -73,7 +81,7 @@ try:
     _version_path = Path(__file__).resolve().parent.parent.parent / "VERSION"
     VERSION = _version_path.read_text().strip()
 except:
-    VERSION = "0.1.6"
+    VERSION = "0.1.7"
 
 
 app = FastAPI(

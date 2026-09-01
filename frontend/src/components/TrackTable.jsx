@@ -308,37 +308,37 @@ export default function TrackTable({
             if (col.key === 'last_fixed_at') {
                 return (
                     <div key={col.key} style={{ width }} className="flex flex-wrap items-center gap-x-1.5 gap-y-1 py-1 overflow-hidden shrink-0">
-                        {track.has_junk && (
-                        <span className="px-1 py-0.5 rounded bg-fn-danger/10 text-fn-danger text-[8px] font-black uppercase tracking-tighter border border-fn-danger/20 leading-none shrink-0">
+                        {track.has_junk ? (
+                        <span className="px-1.5 py-0.5 rounded bg-fn-danger/20 text-[#f2746e] text-[9px] font-bold uppercase tracking-wider border border-fn-danger/35 leading-none shrink-0">
                             Junk
                         </span>
-                        )}
+                        ) : null}
                         {track.has_lyrics ? (
-                        <span className="px-1 py-0.5 rounded bg-fn-success/10 text-fn-success text-[8px] font-black uppercase tracking-tighter border border-fn-success/20 leading-none shrink-0">
+                        <span className="px-1.5 py-0.5 rounded bg-fn-success/20 text-[#79cb8d] text-[9px] font-bold uppercase tracking-wider border border-fn-success/35 leading-none shrink-0">
                             LRC
                         </span>
                         ) : (
-                        <span className="px-1 py-0.5 rounded bg-surface-3 text-ink-faint text-[8px] font-black uppercase tracking-tighter border border-surface-5/10 leading-none shrink-0">
+                        <span className="px-1.5 py-0.5 rounded bg-surface-3 text-ink-muted text-[9px] font-bold uppercase tracking-wider border border-surface-5/50 leading-none shrink-0">
                             No Lyrics
                         </span>
                         )}
                         {track.language && (
-                            <span className="px-1 py-0.5 rounded bg-surface-3 text-ink-muted text-[8px] font-black uppercase tracking-tighter border border-surface-5/10 leading-none shrink-0">
+                            <span className="px-1.5 py-0.5 rounded bg-surface-3 text-ink-normal text-[9px] font-bold uppercase tracking-wider border border-surface-5/50 leading-none shrink-0">
                                 {track.language.substring(0, 3).toUpperCase()}
                             </span>
                         )}
                         {track.llm_fix_count > 0 && (
-                        <span className="flex items-center gap-0.5 px-1 py-0.5 rounded-full bg-amber-400/10 text-amber-500 border border-amber-400/20 text-[8px] font-black uppercase tracking-tighter leading-none shrink-0" title={`AI Optimized ${track.llm_fix_count} time(s)`}>
+                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-400 border border-amber-400/35 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0" title={`AI Optimized ${track.llm_fix_count} time(s)`}>
                             ✨ {track.llm_fix_count}
                         </span>
                         )}
                         {track.local_fix_count > 0 && (
-                        <span className="flex items-center gap-0.5 px-1 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 text-[8px] font-black uppercase tracking-tighter leading-none shrink-0" title={`Locally Standardized ${track.local_fix_count} time(s)`}>
+                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/35 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0" title={`Locally Standardized ${track.local_fix_count} time(s)`}>
                             📦 {track.local_fix_count}
                         </span>
                         )}
                         {track.last_fixed_at && (
-                            <span className="text-[9px] text-ink-faint font-medium opacity-60 whitespace-nowrap shrink-0">
+                            <span className="text-[10px] text-ink-muted font-mono font-medium whitespace-nowrap shrink-0">
                             {track.last_fixed_at.split(' ')[1].substring(0, 5)} • {track.last_fixed_at.split(' ')[0].split('-').slice(1).join('/')}
                             </span>
                         )}
@@ -350,11 +350,17 @@ export default function TrackTable({
             if (col.key === 'duration') val = formatDuration(track.duration);
             if (col.key === 'bitrate' && track.bitrate) val = `${track.bitrate}k`;
             
+            const textColorClass = col.key === 'title' 
+              ? 'text-ink-rich font-medium' 
+              : col.key === 'artist' 
+              ? 'text-ink-normal font-medium' 
+              : 'text-ink-normal';
+            
             return (
                 <div 
                     key={col.key} 
                     style={{ width }} 
-                    className={`truncate text-sm shrink-0 ${col.key === 'artist' ? 'text-ink-normal' : 'text-ink-muted'} flex items-center gap-2`}
+                    className={`truncate text-sm shrink-0 ${textColorClass} flex items-center gap-2`}
                     onClick={(e) => {
                         if (col.key === 'title') {
                             e.stopPropagation();
@@ -370,10 +376,10 @@ export default function TrackTable({
                         {val}
                     </span>
                     {col.key === 'title' && track.last_fix_type === 'llm' && (
-                        <div className="flex-shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-400/10 border border-amber-400/20 group/timer ml-auto animate-fade-in" title={`AI Fixed: ${track.last_ai_fix_duration ? track.last_ai_fix_duration.toFixed(1) : '—'}s`}>
-                            <svg className="w-2.5 h-2.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>
+                        <div className="flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-400/15 border border-amber-400/30 group/timer ml-auto animate-fade-in" title={`AI Fixed: ${track.last_ai_fix_duration ? track.last_ai_fix_duration.toFixed(1) : '—'}s`}>
+                            <svg className="w-2.5 h-2.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>
                             {track.last_ai_fix_duration > 0 && (
-                                <span className="text-[9px] font-mono font-bold text-amber-500/80 tracking-tighter">
+                                <span className="text-[9px] font-mono font-bold text-amber-400 tracking-tighter">
                                     {track.last_ai_fix_duration.toFixed(1)}s
                                 </span>
                             )}
@@ -389,7 +395,7 @@ export default function TrackTable({
   return (
     <div className="studio-card overflow-x-auto custom-scrollbar">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-surface-5/30 text-[10px] font-semibold text-ink-faint uppercase tracking-widest relative bg-surface-2/50 backdrop-blur-sm sticky top-0 z-30 min-w-max">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-surface-5/40 text-[10px] font-bold text-ink-normal uppercase tracking-wider relative bg-surface-2/70 backdrop-blur-sm sticky top-0 z-30 min-w-max">
         <div className="w-9 flex-shrink-0">
           <input
             type="checkbox"

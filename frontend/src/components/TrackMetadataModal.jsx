@@ -238,38 +238,40 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
   if (!tracks.length) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink-rich/60 backdrop-blur-sm animate-fade-in">
-      <div className={`bg-surface-1 rounded-2xl border border-surface-5/30 w-full flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ${isAuditing ? 'max-w-7xl' : 'max-w-6xl'} max-h-[90vh]`}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+      <div className={`bg-surface-1 rounded-2xl border border-surface-5/50 w-full flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ${isAuditing ? 'max-w-7xl' : 'max-w-6xl'} max-h-[94vh] sm:max-h-[90vh]`}>
         {/* Header */}
-        <div className="px-6 py-4 border-b border-surface-5/20 flex items-center justify-between bg-surface-1/50">
-          <div>
-            <h2 className="text-lg font-bold text-ink-rich flex items-center gap-2">
-              <svg className={`w-5 h-5 ${isAuditing ? 'text-blue-400' : 'text-amber-400'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-surface-5/40 flex items-center justify-between bg-surface-1/90">
+          <div className="min-w-0 flex-1 mr-3">
+            <h2 className="text-base sm:text-lg font-bold text-ink-rich flex items-center gap-2 truncate">
+              <svg className={`w-5 h-5 shrink-0 ${isAuditing ? 'text-blue-400' : 'text-amber-400'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 {isAuditing ? (
                     <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 ) : (
                     <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                 )}
               </svg>
-              {isAuditing 
-                ? `Audit History: ${tracks[0].filename}` 
-                : isBulk ? `Bulk Edit ${tracks.length} Tracks` : tracks[0].filename
-              }
+              <span className="truncate">
+                {isAuditing 
+                  ? `Audit History: ${tracks[0].filename}` 
+                  : isBulk ? `Bulk Edit ${tracks.length} Tracks` : tracks[0].filename
+                }
+              </span>
             </h2>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
              {isAuditing && (
                 <button 
                   onClick={() => {
                     setIsAuditing(false);
                     setSelectedHistoryEntry(null);
                   }}
-                  className="text-xs font-bold text-ink-faint hover:text-ink-normal uppercase tracking-widest px-4 py-2 rounded-lg bg-surface-5/30 transition-all"
+                  className="text-xs font-bold text-ink-normal hover:text-ink-rich uppercase tracking-wider px-3 py-1.5 rounded-lg bg-surface-4 hover:bg-surface-5 transition-all"
                 >
                   Back to Editor
                 </button>
              )}
-             <button onClick={onClose} className="p-2 hover:bg-surface-5/30 rounded-xl transition-colors text-ink-muted">
+             <button onClick={onClose} className="p-1.5 hover:bg-surface-4 rounded-xl transition-colors text-ink-muted hover:text-ink-rich">
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
              </button>
           </div>
@@ -286,27 +288,26 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
           ) : (
             <>
               {/* Edit Mode Content */}
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col lg:row gap-8 lg:flex-row custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 custom-scrollbar">
                 {/* Main Fields Form */}
-                <form id="metadata-form" onSubmit={handleSave} className="flex-1 space-y-6">
-                  <h3 className="text-xs font-bold text-ink-faint uppercase tracking-[0.2em] mb-4">Standard Metadata</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                <form id="metadata-form" onSubmit={handleSave} className="flex-1 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
                       { label: 'Title', name: 'title' },
                       { label: 'Artist', name: 'artist' },
-                      { label: 'Album / Movie', name: 'album' },
+                      { label: 'Album', name: 'album' },
                       { label: 'Genre', name: 'genre' },
                       { label: 'Year', name: 'year' },
                       { label: 'Composer', name: 'composer' },
                       { label: 'Language', name: 'language' }
                     ].map(field => (
                       <div key={field.name} className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">{field.label}</label>
+                        <label className="text-xs font-bold text-ink-normal uppercase tracking-wider">{field.label}</label>
                         <input
                           name={field.name}
                           value={formData[field.name]}
                           onChange={handleChange}
-                          className="w-full bg-surface-2 border border-surface-5/30 rounded-lg px-3 py-2 text-sm text-ink-normal focus:ring-1 focus:ring-amber-400 outline-none transition-all placeholder:italic"
+                          className="w-full bg-surface-2 border border-surface-5/50 rounded-lg px-3 py-2 text-sm text-ink-rich font-medium focus:ring-1 focus:ring-amber-400 focus:border-amber-400/50 outline-none transition-all placeholder:italic"
                           placeholder={isBulk ? "(Multiple values)" : ""}
                         />
                       </div>
@@ -315,30 +316,30 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
 
                   {!isBulk && (
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">File Path (Migration)</label>
+                      <label className="text-xs font-bold text-ink-normal uppercase tracking-wider">File Path (Migration)</label>
                       <div className="relative group">
                           <input
                               name="newPath"
                               value={formData.newPath}
                               onChange={handleChange}
-                              className="w-full bg-surface-2 border border-surface-5/30 rounded-lg px-3 py-2 text-xs text-ink-muted font-mono focus:ring-1 focus:ring-amber-400 outline-none"
+                              className="w-full bg-surface-2 border border-surface-5/50 rounded-lg px-3 py-2 text-xs text-ink-rich font-mono focus:ring-1 focus:ring-amber-400 outline-none"
                           />
                           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-                              <span className="text-[8px] uppercase font-bold text-amber-500/60 bg-amber-500/5 px-1.5 py-0.5 rounded border border-amber-500/10">Physical Move</span>
+                              <span className="text-[9px] uppercase font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">Physical Move</span>
                           </div>
                       </div>
-                      <p className="text-[9px] text-ink-faint italic px-1">Changing this will physically move the file on your disk and update the library.</p>
+                      <p className="text-[10px] text-ink-muted italic px-1">Changing this will physically move the file on your disk and update the library.</p>
                     </div>
                   )}
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">Lyrics</label>
+                    <label className="text-xs font-bold text-ink-normal uppercase tracking-wider">Lyrics</label>
                     <textarea
                       name="lyrics"
                       value={formData.lyrics}
                       onChange={handleChange}
                       rows={isBulk ? 2 : 6}
-                      className="w-full bg-surface-2 border border-surface-5/30 rounded-lg px-3 py-2 text-sm text-ink-normal focus:ring-1 focus:ring-amber-400 outline-none font-mono text-xs leading-relaxed"
+                      className="w-full bg-surface-2 border border-surface-5/50 rounded-lg px-3 py-2 text-sm text-ink-rich focus:ring-1 focus:ring-amber-400 outline-none font-mono text-xs leading-relaxed"
                     />
                   </div>
 
