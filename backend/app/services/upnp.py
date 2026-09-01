@@ -4,9 +4,11 @@ import asyncio
 import html
 import logging
 import os
+import urllib.error
+import urllib.request
 from typing import Mapping, Optional
 
-from async_upnp_client.aiohttp import AiohttpRequester
+from async_upnp_client.client import UpnpRequester
 from async_upnp_client.client_factory import UpnpFactory
 from async_upnp_client.const import HttpRequest, HttpResponse
 from async_upnp_client.search import async_search
@@ -17,35 +19,56 @@ logger = logging.getLogger(__name__)
 _renderers: dict[str, dict] = {}
 
 
-class ResilientRequester(AiohttpRequester):
+class BulletproofRequester(UpnpRequester):
     """
-    Enhanced UPnP HTTP requester with automatic retry, Connection: close header,
-    and resilience against abrupt TCP disconnections common in embedded streamers (e.g. upmpdcli, RoPieee).
+    Standard-compliant HTTP requester using urllib over thread pool.
+    Completely avoids aiohttp socket reuse/keep-alive issues with embedded UPnP microhttpd
+    servers (such as upmpdcli, RoPieee, and libupnpp) that abruptly disconnect on pooled connections.
     """
 
     def __init__(self, timeout: int = 10, http_headers: Optional[Mapping[str, str]] = None):
+        super().__init__()
+        self._timeout = timeout
+        self._headers = dict(http_headers or {})
+
+    def _sync_http_request(self, http_request: HttpRequest) -> HttpResponse:
         headers = {
-            "Connection": "close",
             "User-Agent": "LexiTag/0.1.7 UPnP/1.1",
-            **(http_headers or {})
+            "Connection": "close",
+            "Accept": "*/*",
+            **self._headers,
+            **(http_request.headers or {})
         }
-        super().__init__(timeout=timeout, http_headers=headers)
+
+        data = None
+        if http_request.body:
+            if isinstance(http_request.body, str):
+                data = http_request.body.encode("utf-8")
+            else:
+                data = http_request.body
+
+        req = urllib.request.Request(
+            http_request.url,
+            data=data,
+            headers=headers,
+            method=http_request.method
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+                status = resp.status
+                resp_headers = dict(resp.headers)
+                body = resp.read().decode("utf-8", errors="replace")
+                return HttpResponse(status, resp_headers, body)
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace") if e.fp else ""
+            return HttpResponse(e.code, dict(e.headers), body)
 
     async def async_http_request(self, http_request: HttpRequest) -> HttpResponse:
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                headers = dict(http_request.headers or {})
-                headers["Connection"] = "close"
-                headers.setdefault("User-Agent", "LexiTag/0.1.7 UPnP/1.1")
-
-                req = HttpRequest(
-                    method=http_request.method,
-                    url=http_request.url,
-                    headers=headers,
-                    body=http_request.body
-                )
-                return await super().async_http_request(req)
+                return await asyncio.to_thread(self._sync_http_request, http_request)
             except Exception as err:
                 if attempt == max_retries - 1:
                     logger.warning(
@@ -53,22 +76,23 @@ class ResilientRequester(AiohttpRequester):
                         f"({http_request.method} {http_request.url}): {err}"
                     )
                     raise
-                await asyncio.sleep(0.15 * (attempt + 1))
+                await asyncio.sleep(0.2 * (attempt + 1))
 
 
 def _get_factory(timeout: int = 8) -> UpnpFactory:
-    """Create a non-strict UpnpFactory configured with ResilientRequester."""
-    requester = ResilientRequester(timeout=timeout)
+    """Create a non-strict UpnpFactory configured with BulletproofRequester."""
+    requester = BulletproofRequester(timeout=timeout)
     return UpnpFactory(requester, non_strict=True)
 
 
 async def discover_renderers(timeout: int = 5) -> list[dict]:
     """
     Discover UPnP/DLNA & OpenHome media renderers on the local network with 
-    robust logging, non-strict XML parsing, and connection-drop retry handling.
+    strict request deduplication and socket-level resilience.
     """
     global _renderers
     _renderers.clear()
+    seen_locations: set[str] = set()
 
     bind_ip = os.environ.get("BIND_IP", "0.0.0.0")
     logger.info(f"Starting UPnP/OpenHome Discovery: Timeout={timeout}s, Bind IP={bind_ip}")
@@ -83,11 +107,14 @@ async def discover_renderers(timeout: int = 5) -> list[dict]:
     ]
 
     async def on_device_found(headers: dict):
-        location = headers.get("location", "")
-        if not location or location in [r["location"] for r in _renderers.values()]:
+        location = (headers.get("location") or "").strip()
+        if not location or location in seen_locations or location in [r["location"] for r in _renderers.values()]:
             return
 
-        logger.debug(f"Found potential UPnP/OpenHome device at: {location}")
+        # Shield against parallel SSDP response flood
+        seen_locations.add(location)
+
+        logger.debug(f"Parsing UPnP/OpenHome device at: {location}")
         try:
             device = await factory.async_create_device(location)
             device_type = device.device_type or ""
