@@ -70,7 +70,7 @@ export default function PlayerBar() {
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-surface-5/30 bg-surface-1/95 backdrop-blur-lg">
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-surface-5/30 bg-surface-1/95 backdrop-blur-lg w-full max-w-full overflow-hidden">
         {/* Scrubber - Large Hit Area */}
         <div
           ref={scrubberRef}

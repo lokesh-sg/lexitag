@@ -28,9 +28,9 @@ export default function Layout({ children }) {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-surface-0 overflow-hidden">
+    <div className="h-screen w-screen max-w-full flex flex-col bg-surface-0 overflow-hidden">
       {/* Header */}
-      <header className="shrink-0 border-b border-surface-5/40 bg-surface-1/90 backdrop-blur-md z-30">
+      <header className="shrink-0 border-b border-surface-5/40 bg-surface-1/90 backdrop-blur-md z-30 w-full max-w-full">
         <div className="max-w-[1920px] mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">
           {/* Logo */}
           <NavLink to="/" className="flex items-center gap-2 sm:gap-2.5 group transition-transform active:scale-95 shrink-0">
@@ -99,10 +99,10 @@ export default function Layout({ children }) {
       </header>
 
       {/* Content Wrapper */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative w-full max-w-full min-w-0">
         {/* Main Area */}
-        <main className={`flex-1 overflow-y-auto transition-all duration-300 relative`}>
-          <div className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-32">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden transition-all duration-300 relative w-full max-w-full min-w-0">
+          <div className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-3 sm:py-6 pb-36 min-w-0">
             {children}
           </div>
         </main>

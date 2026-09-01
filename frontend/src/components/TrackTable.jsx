@@ -393,7 +393,7 @@ export default function TrackTable({
   };
 
   return (
-    <div className="studio-card overflow-x-auto custom-scrollbar">
+    <div className="studio-card overflow-x-auto custom-scrollbar w-full max-w-full min-w-0 overscroll-x-contain">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-surface-5/40 text-[10px] font-bold text-ink-normal uppercase tracking-wider relative bg-surface-2/70 backdrop-blur-sm sticky top-0 z-30 min-w-max">
         <div className="w-9 flex-shrink-0">

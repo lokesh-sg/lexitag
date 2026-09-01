@@ -26,9 +26,9 @@ export default function Filters({
     ];
 
   return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full max-w-full min-w-0">
       {/* Search & Filter Pills Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 min-w-0 max-w-full">
         {/* Search */}
         <div className="relative w-full sm:w-80 flex items-center group shrink-0">
           <div className="absolute left-1 top-1/2 -translate-y-1/2 z-10">
@@ -53,7 +53,7 @@ export default function Filters({
             placeholder={searchField === 'all' ? "Search everywhere..." : `Search in ${searchField}...`}
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            className="input-field !pl-[95px] pr-[35px] !text-xs !h-9 border-surface-5/50 focus:border-amber-400/50"
+            className="input-field !pl-[95px] pr-[35px] !text-xs !h-9 border-surface-5/50 focus:border-amber-400/50 w-full"
             id="search-input"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -83,7 +83,7 @@ export default function Filters({
         </div>
 
         {/* Filter tabs — with smooth horizontal scroll on mobile */}
-        <div className="flex items-center bg-surface-2 rounded-lg border border-surface-5/50 p-0.5 overflow-x-auto scrollbar-none max-w-full">
+        <div className="flex items-center bg-surface-2 rounded-lg border border-surface-5/50 p-0.5 overflow-x-auto scrollbar-none max-w-full shrink-0">
           {FILTERS.map(f => (
             <button
               key={f.key}
@@ -102,7 +102,7 @@ export default function Filters({
       </div>
 
       {/* Controls Right (Page Size & Grouping) */}
-      <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 md:pt-0">
+      <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 md:pt-0 w-full sm:w-auto">
         {/* Page Size */}
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-bold uppercase text-ink-muted tracking-wider hidden sm:inline">Per page:</span>

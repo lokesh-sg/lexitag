@@ -247,198 +247,211 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Header bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Filename Cleaning Toggle */}
-          <label className="flex items-center gap-2 cursor-pointer group bg-surface-2/50 px-3 py-1.5 rounded-lg hover:bg-surface-3 transition-colors border border-surface-4">
+      {/* Header Bar */}
+      <div className="flex flex-col gap-3">
+        {/* Top Row: Title, Quick Badges & Utility Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg sm:text-2xl font-bold text-ink-rich font-display tracking-tight">Music Library</h2>
+            <span className="text-[10px] sm:text-xs text-ink-muted bg-surface-2 px-2.5 py-1 rounded-full border border-surface-4 font-medium">
+              {tracks.total.toLocaleString()} track{tracks.total !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Filename Cleaning Toggle */}
+            <label className="flex items-center gap-1.5 cursor-pointer group bg-surface-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-3 transition-colors border border-surface-4">
               <div className="relative">
                 <input 
                   type="checkbox" 
                   className="sr-only" 
                   checked={cleanFilenames}
-                  onChange={(e) => {
-                    setCleanFilenames(e.target.checked);
-                  }}
+                  onChange={(e) => setCleanFilenames(e.target.checked)}
                 />
-                <div className={`w-7 h-3.5 rounded-full transition-colors ${cleanFilenames ? 'bg-amber-400' : 'bg-surface-5'}`} />
-                <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 rounded-full bg-white shadow-sm transition-transform ${cleanFilenames ? 'translate-x-3.5' : ''}`} />
+                <div className={`w-6 h-3 rounded-full transition-colors ${cleanFilenames ? 'bg-amber-400' : 'bg-surface-5'}`} />
+                <div className={`absolute top-0.5 left-0.5 w-2 h-2 rounded-full bg-white shadow-sm transition-transform ${cleanFilenames ? 'translate-x-3' : ''}`} />
               </div>
-              <span className="text-[10px] font-bold text-ink-muted group-hover:text-ink-normal transition-colors uppercase tracking-widest whitespace-nowrap">Clean Filenames</span>
-          </label>
-          <div>
-            <h2 className="text-xl font-bold text-ink-rich font-display">Music Library</h2>
-            <p className="text-xs text-ink-muted mt-0.5">
-              {tracks.total} track{tracks.total !== 1 ? 's' : ''} indexed
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2.5">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleFix}
-                disabled={fixer.isFixing}
-                className="btn-secondary !px-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                id="ai-fix-selected-btn"
-              >
-                <div className="flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                  </svg>
-                  <span>AI Fix {selected.size > 0 ? selected.size : ''}</span>
-                </div>
-              </button>
-              <button
-                onClick={handlePullLyrics}
-                disabled={fixer.isFixing || selected.size === 0}
-                className="btn-secondary !px-3 disabled:opacity-50"
-                title="Pull Lyrics Only (LLM)"
-              >
-                <div className="flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-fn-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
-                  </svg>
-                  <span>Pull Lyrics {selected.size > 0 ? selected.size : ''}</span>
-                </div>
-              </button>
-              <button
-                onClick={handleLocalFix}
-                disabled={selected.size === 0}
-                className="btn-secondary !px-3 disabled:opacity-50"
-                title="Local Standardization (No LLM)"
-              >
-                <div className="flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                    <polyline points="7.5 4.21 12 6.81 16.5 4.21" />
-                    <polyline points="7.5 19.79 7.5 14.6 3 12" />
-                    <polyline points="21 12 16.5 14.6 16.5 19.79" />
-                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                    <line x1="12" y1="22.08" x2="12" y2="12" />
-                  </svg>
-                  <span>Local Fix {selected.size > 0 ? selected.size : ''}</span>
-                </div>
-              </button>
-              <button
-                onClick={handleFixFilenames}
-                disabled={selected.size === 0}
-                className="btn-secondary !px-3 disabled:opacity-50"
-                title="Fix Filenames based on current tags"
-              >
-                <div className="flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                  </svg>
-                  <span>Fix Names {selected.size > 0 ? selected.size : ''}</span>
-                </div>
-              </button>
-              <button
-                onClick={handleSyncLanguage}
-                disabled={selected.size === 0}
-                className="btn-secondary !px-3 disabled:opacity-50"
-                title="Append Language to Genre for Selected"
-              >
-                <div className="flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 7v4a1 1 0 001 1h3" />
-                    <path d="M21 17v-4a1 1 0 00-1-1h-3" />
-                    <path d="M21 3v6h-6" />
-                    <path d="M3 21v-6h6" />
-                    <path d="M16 3l-4 4-4-4" />
-                    <path d="M8 21l4-4 4 4" />
-                  </svg>
-                  <span>Sync Lang {selected.size > 0 ? selected.size : ''}</span>
-                </div>
-              </button>
-              <button
-                onClick={handleSyncLanguageAll}
-                className="btn-secondary !px-3 text-emerald-500 hover:text-emerald-400 border-emerald-500/30 hover:border-emerald-500/60 transition-colors"
-                title="Global Library Sync Language to Genre"
-              >
-                <div className="flex items-center gap-1.5 font-bold">
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M2 12h20" />
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                  </svg>
-                  <span>All Lang</span>
-                </div>
-              </button>
-              <button
-                onClick={handleBulkEdit}
-                className="btn-secondary !px-3"
-                title="Edit shared tags"
-              >
-                <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-              </button>
-            </div>
-          {/* Settings toggle */}
-          <button
-            onClick={() => setShowSettings(v => !v)}
-            className={`p-2 rounded-lg transition-all duration-200 ${
-              showSettings
-                ? 'bg-amber-400/15 text-amber-400'
-                : 'text-ink-muted hover:text-ink-normal hover:bg-surface-3'
-            }`}
-            title="Studio Configuration"
-            id="settings-btn"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="4" y1="21" x2="4" y2="14" />
-              <line x1="4" y1="10" x2="4" y2="3" />
-              <line x1="12" y1="21" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12" y2="3" />
-              <line x1="20" y1="21" x2="20" y2="16" />
-              <line x1="20" y1="12" x2="20" y2="3" />
-              <line x1="2" y1="14" x2="6" y2="14" />
-              <line x1="10" y1="8" x2="14" y2="8" />
-              <line x1="18" y1="16" x2="22" y2="16" />
-            </svg>
-          </button>
-          <button
-            onClick={tracks.refresh}
-            disabled={tracks.scanning}
-            className="btn-ghost disabled:opacity-50"
-            title="Fast junk re-evaluation"
-          >
-            <span className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold text-ink-muted group-hover:text-ink-normal transition-colors uppercase tracking-wider whitespace-nowrap">Clean Names</span>
+            </label>
+
+            {/* Refresh Status */}
+            <button
+              onClick={tracks.refresh}
+              disabled={tracks.scanning}
+              className="p-2 rounded-lg bg-surface-2 border border-surface-4 text-ink-muted hover:text-amber-400 hover:bg-surface-3 transition-all disabled:opacity-50"
+              title="Fast junk re-evaluation"
+            >
               {tracks.scanning && tracks.scanProgress?.type === 'refresh' ? (
-                <svg className="w-3.5 h-3.5 animate-spin-slow text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg className="w-4 h-4 animate-spin-slow text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M21 12a9 9 0 11-6.219-8.56" />
                 </svg>
               ) : (
-                <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M23 4v6h-6M1 20v-6h6" />
                   <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                 </svg>
               )}
-              {tracks.scanning && tracks.scanProgress?.type === 'refresh' ? 'Refreshing…' : 'Refresh Status'}
-            </span>
-          </button>
-          <button
-            onClick={tracks.scan}
-            disabled={tracks.scanning}
-            className="btn-ghost disabled:opacity-50"
-            id="scan-library-btn"
-          >
-            <span className="flex items-center gap-1.5">
+            </button>
+
+            {/* Scan Library */}
+            <button
+              onClick={tracks.scan}
+              disabled={tracks.scanning}
+              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-surface-2 border border-surface-4 text-ink-normal hover:text-amber-400 hover:bg-surface-3 transition-all disabled:opacity-50 text-xs font-semibold flex items-center gap-1.5"
+              id="scan-library-btn"
+              title="Full Library Scan"
+            >
               {tracks.scanning && tracks.scanProgress?.type !== 'refresh' ? (
-                <svg className="w-3.5 h-3.5 animate-spin-slow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg className="w-3.5 h-3.5 animate-spin-slow text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M21 12a9 9 0 11-6.219-8.56" />
                 </svg>
               ) : (
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 4v5h.582M20 20v-5h-.581M4.582 9A8 8 0 0 1 19.42 15" />
                 </svg>
               )}
-              {tracks.scanning && tracks.scanProgress?.type !== 'refresh' ? 'Scanning…' : 'Scan Library'}
-            </span>
+              <span className="hidden sm:inline">{tracks.scanning && tracks.scanProgress?.type !== 'refresh' ? 'Scanning…' : 'Scan'}</span>
+            </button>
+
+            {/* Settings toggle */}
+            <button
+              onClick={() => setShowSettings(v => !v)}
+              className={`p-2 rounded-lg border transition-all duration-200 ${
+                showSettings
+                  ? 'bg-amber-400/20 text-amber-400 border-amber-400/40 shadow-sm'
+                  : 'bg-surface-2 border-surface-4 text-ink-muted hover:text-ink-normal hover:bg-surface-3'
+              }`}
+              title="Studio Configuration"
+              id="settings-btn"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="4" y1="21" x2="4" y2="14" />
+                <line x1="4" y1="10" x2="4" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12" y2="3" />
+                <line x1="20" y1="21" x2="20" y2="16" />
+                <line x1="20" y1="12" x2="20" y2="3" />
+                <line x1="2" y1="14" x2="6" y2="14" />
+                <line x1="10" y1="8" x2="14" y2="8" />
+                <line x1="18" y1="16" x2="22" y2="16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Second Row: Action Buttons Toolbar (Scrollable horizontally on mobile) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 max-w-full">
+          <button
+            onClick={handleFix}
+            disabled={fixer.isFixing || selected.size === 0}
+            className="btn-secondary !px-3 !py-1.5 !text-xs shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+            id="ai-fix-selected-btn"
+          >
+            <div className="flex items-center gap-1.5 font-bold">
+              <svg className="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+              </svg>
+              <span>AI Fix {selected.size > 0 ? `(${selected.size})` : ''}</span>
+            </div>
+          </button>
+
+          <button
+            onClick={handlePullLyrics}
+            disabled={fixer.isFixing || selected.size === 0}
+            className="btn-secondary !px-3 !py-1.5 !text-xs shrink-0 disabled:opacity-40"
+            title="Pull Lyrics Only (LLM)"
+          >
+            <div className="flex items-center gap-1.5 font-bold">
+              <svg className="w-3.5 h-3.5 text-fn-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+              <span>Lyrics {selected.size > 0 ? `(${selected.size})` : ''}</span>
+            </div>
+          </button>
+
+          <button
+            onClick={handleLocalFix}
+            disabled={selected.size === 0}
+            className="btn-secondary !px-3 !py-1.5 !text-xs shrink-0 disabled:opacity-40"
+            title="Local Standardization (No LLM)"
+          >
+            <div className="flex items-center gap-1.5 font-bold">
+              <svg className="w-3.5 h-3.5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                <polyline points="7.5 4.21 12 6.81 16.5 4.21" />
+                <polyline points="7.5 19.79 7.5 14.6 3 12" />
+                <polyline points="21 12 16.5 14.6 16.5 19.79" />
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                <line x1="12" y1="22.08" x2="12" y2="12" />
+              </svg>
+              <span>Local Fix {selected.size > 0 ? `(${selected.size})` : ''}</span>
+            </div>
+          </button>
+
+          <button
+            onClick={handleFixFilenames}
+            disabled={selected.size === 0}
+            className="btn-secondary !px-3 !py-1.5 !text-xs shrink-0 disabled:opacity-40"
+            title="Fix Filenames based on current tags"
+          >
+            <div className="flex items-center gap-1.5 font-bold">
+              <svg className="w-3.5 h-3.5 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+              <span>Fix Names {selected.size > 0 ? `(${selected.size})` : ''}</span>
+            </div>
+          </button>
+
+          <button
+            onClick={handleSyncLanguage}
+            disabled={selected.size === 0}
+            className="btn-secondary !px-3 !py-1.5 !text-xs shrink-0 disabled:opacity-40"
+            title="Append Language to Genre for Selected"
+          >
+            <div className="flex items-center gap-1.5 font-bold">
+              <svg className="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 7v4a1 1 0 001 1h3" />
+                <path d="M21 17v-4a1 1 0 00-1-1h-3" />
+                <path d="M21 3v6h-6" />
+                <path d="M3 21v-6h6" />
+                <path d="M16 3l-4 4-4-4" />
+                <path d="M8 21l4-4 4 4" />
+              </svg>
+              <span>Sync Lang {selected.size > 0 ? `(${selected.size})` : ''}</span>
+            </div>
+          </button>
+
+          <button
+            onClick={handleSyncLanguageAll}
+            className="btn-secondary !px-3 !py-1.5 !text-xs shrink-0 text-emerald-400 hover:text-emerald-300 border-emerald-500/30 hover:border-emerald-500/60 transition-colors"
+            title="Global Library Sync Language to Genre"
+          >
+            <div className="flex items-center gap-1.5 font-bold">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M2 12h20" />
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
+              <span>All Lang</span>
+            </div>
+          </button>
+
+          <button
+            onClick={handleBulkEdit}
+            disabled={selected.size === 0}
+            className="btn-secondary !px-3 !py-1.5 !text-xs shrink-0 disabled:opacity-40"
+            title="Edit shared tags"
+          >
+            <div className="flex items-center gap-1.5 font-bold">
+              <svg className="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              <span>Edit</span>
+            </div>
           </button>
         </div>
       </div>
@@ -468,20 +481,23 @@ export default function Dashboard() {
         onPageSizeChange={tracks.setPageSize}
       />
 
-      <div className="flex items-center justify-between gap-4 mt-2">
-        <div className="flex-1" />
-        {tracks.total > tracks.pageSize && (
-            <div className="flex items-center gap-1.5">
-                <button onClick={() => tracks.setPage(1)} disabled={tracks.page <= 1} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">First</button>
-                <button onClick={() => tracks.setPage(p => Math.max(1, p-1))} disabled={tracks.page <= 1} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">←</button>
-                <div className="px-3 py-1 rounded-lg bg-surface-3 border border-surface-4 text-[10px] font-black text-amber-500 tabular-nums">
-                    {tracks.page} / {Math.ceil(tracks.total / tracks.pageSize)}
-                </div>
-                <button onClick={() => tracks.setPage(p => p+1)} disabled={tracks.page * tracks.pageSize >= tracks.total} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">→</button>
-                <button onClick={() => tracks.setPage(Math.ceil(tracks.total / tracks.pageSize))} disabled={tracks.page * tracks.pageSize >= tracks.total} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">Last</button>
+      {/* Pagination Row */}
+      {tracks.total > tracks.pageSize && (
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
+          <div className="text-xs text-ink-muted">
+            Page {tracks.page} of {Math.ceil(tracks.total / tracks.pageSize)}
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            <button onClick={() => tracks.setPage(1)} disabled={tracks.page <= 1} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-muted uppercase tracking-tighter">First</button>
+            <button onClick={() => tracks.setPage(p => Math.max(1, p-1))} disabled={tracks.page <= 1} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-normal">←</button>
+            <div className="px-3 py-1 rounded-lg bg-surface-3 border border-surface-4 text-[10px] font-black text-amber-400 tabular-nums">
+              {tracks.page} / {Math.ceil(tracks.total / tracks.pageSize)}
             </div>
-        )}
-      </div>
+            <button onClick={() => tracks.setPage(p => p+1)} disabled={tracks.page * tracks.pageSize >= tracks.total} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-normal">→</button>
+            <button onClick={() => tracks.setPage(Math.ceil(tracks.total / tracks.pageSize))} disabled={tracks.page * tracks.pageSize >= tracks.total} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-muted uppercase tracking-tighter">Last</button>
+          </div>
+        </div>
+      )}
 
       {/* Track table */}
       <TrackTable
