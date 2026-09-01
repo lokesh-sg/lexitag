@@ -2,10 +2,10 @@
 
 import asyncio
 import html
+import http.client
 import logging
 import os
-import urllib.error
-import urllib.request
+import urllib.parse
 from typing import Mapping, Optional
 
 from async_upnp_client.client import UpnpRequester
@@ -19,22 +19,30 @@ logger = logging.getLogger(__name__)
 _renderers: dict[str, dict] = {}
 
 
-class BulletproofRequester(UpnpRequester):
+class DualProtocolRequester(UpnpRequester):
     """
-    Standard-compliant HTTP requester using urllib over thread pool.
-    Completely avoids aiohttp socket reuse/keep-alive issues with embedded UPnP microhttpd
-    servers (such as upmpdcli, RoPieee, and libupnpp) that abruptly disconnect on pooled connections.
+    Standard-compliant HTTP requester using http.client over a thread pool.
+    Explicitly manages per-request socket lifecycles with automatic HTTP/1.1 and
+    HTTP/1.0 fallback to prevent socket resets and connection drops from embedded
+    UPnP micro-servers (such as npupnp, libupnp, upmpdcli, and RoPieee).
     """
 
-    def __init__(self, timeout: int = 10, http_headers: Optional[Mapping[str, str]] = None):
+    def __init__(self, timeout: int = 8, http_headers: Optional[Mapping[str, str]] = None):
         super().__init__()
         self._timeout = timeout
         self._headers = dict(http_headers or {})
 
-    def _sync_http_request(self, http_request: HttpRequest) -> HttpResponse:
+    def _sync_http_request(self, http_request: HttpRequest, http_version: int = 11) -> HttpResponse:
+        parsed = urllib.parse.urlparse(http_request.url)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 80
+        path = parsed.path or "/"
+        if parsed.query:
+            path += "?" + parsed.query
+
         headers = {
+            "Host": f"{host}:{port}",
             "User-Agent": "LexiTag/0.1.7 UPnP/1.1",
-            "Connection": "close",
             "Accept": "*/*",
             **self._headers,
             **(http_request.headers or {})
@@ -46,29 +54,29 @@ class BulletproofRequester(UpnpRequester):
                 data = http_request.body.encode("utf-8")
             else:
                 data = http_request.body
+            headers["Content-Length"] = str(len(data))
 
-        req = urllib.request.Request(
-            http_request.url,
-            data=data,
-            headers=headers,
-            method=http_request.method
-        )
+        conn = http.client.HTTPConnection(host, port, timeout=self._timeout)
+        if http_version == 10:
+            conn._http_vsn = 10
+            conn._http_vsn_str = "HTTP/1.0"
 
         try:
-            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
-                status = resp.status
-                resp_headers = dict(resp.headers)
-                body = resp.read().decode("utf-8", errors="replace")
-                return HttpResponse(status, resp_headers, body)
-        except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", errors="replace") if e.fp else ""
-            return HttpResponse(e.code, dict(e.headers), body)
+            conn.request(http_request.method, path, body=data, headers=headers)
+            resp = conn.getresponse()
+            body = resp.read().decode("utf-8", errors="replace")
+            resp_headers = dict(resp.getheaders())
+            return HttpResponse(resp.status, resp_headers, body)
+        finally:
+            conn.close()
 
     async def async_http_request(self, http_request: HttpRequest) -> HttpResponse:
         max_retries = 3
         for attempt in range(max_retries):
+            # Attempt 0: HTTP/1.1; Subsequent attempts: HTTP/1.0 fallback
+            vsn = 11 if attempt == 0 else 10
             try:
-                return await asyncio.to_thread(self._sync_http_request, http_request)
+                return await asyncio.to_thread(self._sync_http_request, http_request, vsn)
             except Exception as err:
                 if attempt == max_retries - 1:
                     logger.warning(
@@ -76,12 +84,12 @@ class BulletproofRequester(UpnpRequester):
                         f"({http_request.method} {http_request.url}): {err}"
                     )
                     raise
-                await asyncio.sleep(0.2 * (attempt + 1))
+                await asyncio.sleep(0.25 * (attempt + 1))
 
 
 def _get_factory(timeout: int = 8) -> UpnpFactory:
-    """Create a non-strict UpnpFactory configured with BulletproofRequester."""
-    requester = BulletproofRequester(timeout=timeout)
+    """Create a non-strict UpnpFactory configured with DualProtocolRequester."""
+    requester = DualProtocolRequester(timeout=timeout)
     return UpnpFactory(requester, non_strict=True)
 
 
@@ -111,7 +119,7 @@ async def discover_renderers(timeout: int = 5) -> list[dict]:
         if not location or location in seen_locations or location in [r["location"] for r in _renderers.values()]:
             return
 
-        # Shield against parallel SSDP response flood
+        # Shield against parallel SSDP response floods
         seen_locations.add(location)
 
         logger.debug(f"Parsing UPnP/OpenHome device at: {location}")
