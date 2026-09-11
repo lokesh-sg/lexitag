@@ -19,7 +19,7 @@ echo "[LexiTag] Initializing Backend..."
 cd "$BACKEND_DIR"
 source .venv/bin/activate
 export DATA_DIR="$PROJECT_ROOT/data"
-export MUSIC_DIR="/Volumes/Media/Music/UnOrganized"
+export MUSIC_DIR="${MUSIC_DIR:-$PROJECT_ROOT/music}"
 
 nohup python3 -m uvicorn app.main:app --host 0.0.0.0 --port 3020 --reload --reload-dir app > backend.log 2>&1 &
 echo "[LexiTag] Backend started on port 3020 (PID: $!)"

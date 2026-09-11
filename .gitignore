@@ -43,3 +43,14 @@ Thumbs.db
 # macOS Finder clutter
 *.textClipping
 *.bak
+
+# Scratch & Debug Scripts
+backend/debug_*.py
+backend/heal_*.py
+backend/restore_*.py
+backend/migrate_*.py
+backend/verify_*.py
+backend/fix_*.py
+backend/*.sqliterc
+backend/temp_*
+backend/*.db*
