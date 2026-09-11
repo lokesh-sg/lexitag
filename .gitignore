@@ -24,6 +24,9 @@ frontend/dist/
 # Data directory — contains live database and runtime logs
 data/
 
+# Music library — user content, never committed
+music/
+
 # Build and Backup archives
 builds/
 backups/

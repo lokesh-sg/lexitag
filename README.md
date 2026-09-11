@@ -1,96 +1,104 @@
+<div align="center">
+
+<img src="assets/screenshot-library.png" alt="LexiTag — Music Library Manager" width="900" />
+
 # LexiTag
 
-**Version:** 0.1.8 | **Language:** Python 3.12 / React 18 | **Database:** SQLite
+**Self-hosted AI-powered music metadata manager**
 
-LexiTag is a self-hosted music library metadata manager. It scans your audio files, cleans junk metadata, enriches tags using an AI model, fetches lyrics, and provides a sleek, modern web-based UI for browsing and editing your entire library. Everything runs locally — no cloud sync required.
+[![Version](https://img.shields.io/badge/version-0.1.8-f59e0b?style=flat-square)](CHANGELOG.md)
+[![Docker](https://img.shields.io/badge/docker-lokeshsg%2Flexitag-2496ed?style=flat-square&logo=docker)](https://hub.docker.com/r/lokeshsg/lexitag)
+[![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12-3b82f6?style=flat-square&logo=python)](https://www.python.org/)
+[![React](https://img.shields.io/badge/react-18-61dafb?style=flat-square&logo=react)](https://reactjs.org/)
+
+LexiTag scans your audio files, strips junk metadata, enriches tags with AI, fetches lyrics, and gives you a sleek web UI to manage your entire music library — completely self-hosted, no cloud required.
+
+[Quick Start](#quick-start) · [Docker Deploy](#docker-deployment) · [Features](#features) · [Configuration](#configuration) · [Changelog](CHANGELOG.md)
+
+</div>
 
 ---
 
-## Table of Contents
+## Screenshots
 
-- [Features](#features)
-- [Requirements](#requirements)
-- [Quick Start](#quick-start)
-- [Docker Deployment](#docker-deployment)
-- [Running Locally (Development)](#running-locally-development)
-- [Configuration](#configuration)
-- [Ports](#ports)
-- [Authentication](#authentication)
-- [Periodic Auto-Scan Scheduler](#periodic-auto-scan-scheduler)
-- [How Tag Cleaning Works](#how-tag-cleaning-works)
-- [Multi-Provider AI Support](#multi-provider-ai-support)
-- [Audio Player](#audio-player)
-- [Library Management](#library-management)
-- [History and Revert](#history-and-revert)
-- [Batch Processing](#batch-processing)
-- [Release Notes](#release-notes)
+<table>
+<tr>
+<td width="50%">
+
+**Music Library**
+![Library View](assets/screenshot-library.png)
+
+</td>
+<td width="50%">
+
+**Album Art Gallery**
+![Album Art Gallery](assets/screenshot-gallery.png)
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Settings & AI Providers**
+![Settings](assets/screenshot-settings.png)
+
+</td>
+<td width="50%">
+
+**Smart Filters**
+![Filter View](assets/screenshot-filters.png)
+
+</td>
+</tr>
+</table>
 
 ---
 
 ## Features
 
-### Metadata Cleaning
-- Removes junk embedded in tags: download site URLs, promo text, streaming watermarks, and comment spam.
-- Uses a two-phase cleaning process — local pattern matching runs first, then the AI result is re-scanned to catch anything that crept back in from search results.
-- Supports custom junk patterns configured through the Settings panel.
+### 🤖 AI Metadata Enrichment
+Sends track information to a configured LLM (Gemini, OpenAI-compatible, Anthropic) to identify the correct title, artist, album, year, genre, composer, and language. Works across multiple languages and regional music libraries. Gracefully falls back when a track cannot be identified.
 
-### AI Metadata Enrichment
-- Sends track information to a configured LLM (Gemini, OpenAI-compatible, Anthropic) to identify the correct title, artist, album, year, genre, composer, and language.
-- Works across multiple languages and regional music libraries.
-- Falls back gracefully when a track cannot be identified rather than crashing the batch.
+### 🧹 Metadata Cleaning
+Removes junk embedded in tags: download-site URLs, promo watermarks, streaming labels, and comment spam. Uses a two-phase process — local pattern matching first, then a post-AI re-scan to catch anything that crept back in from search results. Custom junk patterns can be added in Settings.
 
-### Lyrics
-- Searches LRCLIB for time-synced and plain lyrics.
-- Saves lyrics directly into the audio file's metadata tags (ID3 USLT, Vorbis LYRICS, MP4 ©lyr).
-- Language is deduced from the lyrics and stored as an ISO 639-1/639-2 code.
+### 🖼️ Album Art Gallery
+Full-page gallery with group-by-album, group-by-artist, and flat-track views. Multi-select and bulk Apply / Remove operations. AI-powered artwork research using Gemini Google Search Grounding across Apple Music, Spotify, Deezer, Discogs, Wikipedia, MusicBrainz, and Cover Art Archive. Writes folder-level `cover.jpg` / `folder.jpg` for Navidrome and Jellyfin compatibility.
 
-### Language Detection
-- Detects the language of a track based on its title, artist context, and lyrics.
-- Stores the result in the standard TLAN tag (FLAC/MP3) or equivalent.
-- Tracks with "UND" (undetermined) are still flagged for review in the Missing Lyrics filter.
+### 🎵 Lyrics
+Searches LRCLIB for time-synced and plain lyrics. Falls back to Gemini Google Search Grounding for regional tracks not in LRCLIB. Saves lyrics directly into audio file tags (ID3 USLT, Vorbis LYRICS, MP4 ©lyr). Language is deduced from lyrics and stored as an ISO 639-1/639-2 code.
 
-### Audio Player
-- Built-in browser-based audio player supporting MP3, FLAC, WAV, ALAC, and M4A.
-- Full seek support via HTTP Range Requests.
-- Per-track playback directly from the library table without leaving the page.
+### 📻 Built-in Audio Player
+Browser-based player supporting MP3, FLAC, WAV, ALAC, and M4A. Full seek via HTTP Range Requests. Per-track playback directly from the library table.
 
-### UPnP / DLNA Casting
-- Discovers DLNA renderers (TVs, speakers, media receivers) on your local network.
-- Casts any track directly to the selected renderer from the UI.
-- Requires `network_mode: host` in Docker for SSDP multicast to reach the network.
+### 📡 UPnP / DLNA Casting
+Discovers DLNA renderers (TVs, speakers, media receivers) on your local network and casts any track directly to the selected renderer from the UI.
 
-### Library Management
-- Indexes files by scanning configured source directories.
-- Supports multiple library sources with independent enabled/disabled toggles per source.
-- Only enabled sources are scanned — useful when migrating between drives or directories.
-- Customizable Table Columns: Toggle on/off, resize, and re-order columns (Title, Artist, Album, Genre, Language, Year, Composer, Time, Kbps, Type, Comment, Filename, Path, Scanned, Status/Fixed).
-- Column Sorting: Sort tracks by Title, Artist, Album, Genre, Language, Year, Duration, Kbps, and more.
-- Filters available: All, Missing Lyrics, Has Junk, Missing Language, Untouched, Local Fixed, AI Optimized.
+### 📚 Library Management
+- Multiple source directories with independent enable/disable toggles
+- Configurable table columns: toggle, resize, and re-order (Title, Artist, Album, Genre, Language, Year, Composer, Time, Kbps, Type, Comment, Filename, Path, Status)
+- Smart filters: All · Missing Lyrics · Has Junk · Missing Language · Untouched · Local Fixed · AI Optimized
+- Column sorting on all major fields
 
-### Batch Fix
-- Select any number of tracks and run an AI fix, lyrics-only fix, local-only fix, or filename fix.
-- Real-time progress panel with per-track step indicators (Read, Backup, Clean, Lyrics, Lang, Write).
-- Elapsed time display with HH:MM:SS formatting for long-running batches.
-- Stop & Clear button to unlock the UI if a job hangs or the backend restarts mid-batch.
-- Accurate abort reporting shows exactly how many tracks completed before the stop.
+### ⚡ Batch Processing
+Select any tracks and run an AI fix, lyrics-only, local-only, or filename fix. Real-time progress panel with per-track step indicators. Stop & Clear to recover from a hung job. Accurate abort reporting.
 
-### History and Revert
-- Every fix creates a per-field audit record before writing.
-- The History view shows every change with before/after diffs and timestamps.
-- Individual fields, full tracks, or entire batches can be reverted with one click.
+### 🕒 History & Revert
+Every change creates a per-field audit record. The History view shows before/after diffs with timestamps. Revert a single field, an entire track, or a whole batch with one click.
 
-### Manual Editing
-- Click any track to open the metadata editor.
-- Edit title, artist, album, year, genre, composer, lyrics, and language manually.
-- Changes are written directly to the file and synced to the database.
-- Bulk edit: select multiple tracks to update a shared field across all of them at once.
+### ✏️ Manual Editing
+Click any track to open the metadata editor. Edit any field manually. Bulk edit: select multiple tracks to update a shared field across all at once.
+
+### 🔄 Periodic Auto-Scan Scheduler
+Background library scanner with configurable presets (1 h, 6 h, 12 h, 24 h, 7 d) and custom intervals. Live countdown and last-scan timestamp shown in System Config. Non-blocking — prevents duplicate scans if a manual scan is already running.
 
 ---
 
 ## Requirements
 
-- Docker (recommended) or Python 3.12+ and Node 20+
-- An LLM API key (Google Gemini recommended — has a free tier)
+- **Docker** (recommended) — or Python 3.12+ and Node 20+ for local dev
+- An **LLM API key** (Google Gemini recommended — has a free tier)
 - Optionally: a Google Custom Search API key for web search fallback
 
 ---
@@ -98,49 +106,56 @@ LexiTag is a self-hosted music library metadata manager. It scans your audio fil
 ## Quick Start
 
 ```bash
-# Clone or download the project
-cp .env.example .env
-# Edit .env with your LLM_API_KEY and other settings
+# 1. Create a working directory
+mkdir lexitag && cd lexitag
 
+# 2. Copy the example environment file
+curl -O https://raw.githubusercontent.com/lokesh-sg/lexitag/main/.env.example
+cp .env.example .env
+# Edit .env — add your LLM_API_KEY at minimum
+
+# 3. Create directories for your music and database
 mkdir -p music data
 # Copy your audio files into ./music
 
-docker compose up -d # Automatically pulls lokeshsg/lexitag:latest from Docker Hub
-# Access the UI at http://localhost:3030
+# 4. Launch
+docker compose up -d   # Pulls lokeshsg/lexitag:latest automatically
+
+# 5. Open the UI
+open http://localhost:3030
 ```
 
-On first load, go to **Settings > Library Sources** and add the path to your music directory inside the container (`/app/music` by default). Then click **Scan Library** to index your files.
+On first load, go to **Settings → Library Sources** and confirm `/app/music` is listed, then click **Scan** to index your files.
 
 ---
 
 ## Docker Deployment
 
-The official and easiest way to deploy LexiTag is via Docker Compose using our pre-built image from Docker Hub.
+The recommended way to deploy LexiTag is via Docker Compose using the pre-built image from Docker Hub.
 
-1. Create a directory on your server (e.g., `lexitag`) and navigate to it.
-2. Create a `docker-compose.yml` file with the following contents:
+**`docker-compose.yml`**
 
 ```yaml
 services:
   lexitag:
     image: lokeshsg/lexitag:latest
     container_name: lexitag
-    network_mode: "host" # Crucial for UPnP DLNA casting to discover speakers
+    network_mode: "host"       # Required for UPnP/DLNA discovery
     environment:
       - MUSIC_DIR=/app/music
       - DATA_DIR=/app/data
     volumes:
-      - ./music:/app/music # Map your host's music folder here
-      - ./data:/app/data   # Maps the database folder to persist data
+      - ./music:/app/music     # Your host music folder
+      - ./data:/app/data       # Persists the database
     restart: unless-stopped
 ```
 
-3. Ensure your `./music` directory exists and has your music files in it.
-4. Start the container in the background:
-   ```bash
-   docker compose up -d
-   ```
-5. Access the web interface at `http://YOUR_SERVER_IP:3030`.
+> **Note:** `network_mode: host` is required for UPnP SSDP multicast to reach your local network. If you don't use DLNA casting, you can replace it with a standard port mapping (`- "3030:3030"`).
+
+```bash
+docker compose up -d
+# Access at http://YOUR_SERVER_IP:3030
+```
 
 ---
 
@@ -149,8 +164,7 @@ services:
 **Backend:**
 ```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 3020
 ```
@@ -163,7 +177,7 @@ npm run dev
 # Runs on http://localhost:3010, proxied to backend on 3020
 ```
 
-Or use the provided restart script from the project root:
+Or use the convenience script from the project root:
 ```bash
 ./restart.sh
 ```
@@ -172,28 +186,21 @@ Or use the provided restart script from the project root:
 
 ## Configuration
 
-All settings are managed through a `.env` file in the project root.
+All settings are managed through a `.env` file in the project root. Copy `.env.example` to get started.
 
 | Variable | Description | Default |
 |---|---|---|
-| `LLM_API_KEY` | API key for the LLM provider | required |
+| `LLM_API_KEY` | API key for the LLM provider | **required** |
 | `LLM_API_BASE_URL` | Base URL for the completions endpoint | Gemini endpoint |
 | `LLM_MODEL` | Model identifier | `gemini-2.0-flash` |
-| `MUSIC_DIR` | Path to the music library | `/app/music` |
-| `DATA_DIR` | Path for the SQLite database | `/app/data` |
+| `MUSIC_DIR` | Path to the music library (inside container) | `/app/music` |
+| `DATA_DIR` | Path for the SQLite database (inside container) | `/app/data` |
 | `LEXITAG_AUTH_TOKEN` | Optional bearer token to protect the UI | none |
 | `ALLOWED_ORIGINS` | CORS origins (comma-separated) | `*` |
 | `GOOGLE_CSE_KEY` | Google Custom Search API key (optional) | none |
 | `GOOGLE_CSE_CX` | Google Custom Search Engine ID (optional) | none |
 
-Additional providers can be added and managed through **Settings > AI Providers** in the UI without editing `.env`.
-
----
-
-## Security & Deployment
-
-- **Non-Root Execution:** The Docker container runs strictly as a non-root user (`lexitag`).
-- **Path Jailing:** The backend enforces strict path validation to ensure files can only be read from or written to the designated `MUSIC_DIR` and `DATA_DIR`.
+Additional AI providers can be added and managed through **Settings → AI Providers** in the UI without editing `.env`.
 
 ---
 
@@ -203,27 +210,36 @@ Additional providers can be added and managed through **Settings > AI Providers*
 |---|---|---|
 | Development | Frontend (Vite) | 3010 |
 | Development | Backend (uvicorn) | 3020 |
-| Docker / Production | Combined (served from uvicorn) | 3030 |
+| Docker / Production | Combined | 3030 |
 
 ---
 
 ## Authentication
 
-If `LEXITAG_AUTH_TOKEN` is set, all API requests require a `Authorization: Bearer <token>` header. The frontend reads this token from the `VITE_LEXITAG_AUTH_TOKEN` environment variable at build time, or from `window.LEXITAG_TOKEN` at runtime.
+If `LEXITAG_AUTH_TOKEN` is set, all API requests require an `Authorization: Bearer <token>` header. The frontend reads this token from the `VITE_LEXITAG_AUTH_TOKEN` environment variable at build time, or from `window.LEXITAG_TOKEN` at runtime.
 
-To run without auth (local use only), leave both variables unset.
+Leave both variables unset for local, unauthenticated access.
+
+---
+
+## Security
+
+- **Non-Root Container:** The Docker image runs strictly as a dedicated non-root `lexitag` user.
+- **Path Jailing:** The backend enforces strict path validation — files can only be read from or written to `MUSIC_DIR` and `DATA_DIR`.
+- **SSRF Protection:** Strict URL scheme validation (`http://`/`https://` only) before fetching any AI-supplied image URL.
+- **Encrypted API Keys:** Provider API keys are stored encrypted in the local database, not in plain text.
 
 ---
 
 ## How Tag Cleaning Works
 
-LexiTag uses two cleaning passes on every track:
+LexiTag uses three cleaning passes on every track:
 
-1. **Local Pass** — Pattern matching against a built-in and user-configurable list of junk strings (e.g., `Gaana.com`, `HiResTracks.com`, encoded URLs, comment spam). This runs before any AI call.
+1. **Local Pass** — Pattern matching against a built-in and user-configurable list of junk strings (e.g., `Gaana.com`, `HiResTracks.com`, encoded URLs, comment spam). Runs before any AI call.
 
-2. **AI Pass** — The cleaned tags are sent to the LLM with the track's filename and folder name as context. The AI identifies correct metadata and returns a structured result.
+2. **AI Pass** — The cleaned tags are sent to the LLM with the filename and folder name as context. The AI identifies correct metadata and returns a structured result.
 
-3. **Post-AI Pass** — The AI result is re-cleaned through the same local rules. This prevents the AI from accidentally re-introducing junk it encountered in its web search results (e.g., site tags embedded in streaming metadata).
+3. **Post-AI Pass** — The AI result is re-cleaned through the same local rules, preventing the AI from re-introducing junk it encountered in its search results.
 
 Tags like `TSRC`, `TSSE`, and vendor-specific frames are explicitly stripped at write time.
 
@@ -231,135 +247,18 @@ Tags like `TSRC`, `TSSE`, and vendor-specific frames are explicitly stripped at 
 
 ## Multi-Provider AI Support
 
-LexiTag supports multiple AI providers through a single settings panel:
+| Provider | Notes |
+|---|---|
+| **Google Gemini** | Default, recommended. Has a free tier. Supports Google Search Grounding for lyrics and artwork. |
+| **OpenAI** | Any OpenAI-compatible endpoint supported. |
+| **Anthropic Claude** | Supported via the settings panel. |
 
-- **Google Gemini** (default, recommended)
-- **OpenAI** and any OpenAI-compatible endpoint
-- **Anthropic Claude**
-
-Providers can be added, switched, or disabled from **Settings > AI Providers**. API keys are stored encrypted in the database. Only one provider is active at a time.
-
-If the active provider returns a 503 (overloaded) or 429 (rate limited) error, LexiTag will automatically pause and retry the same track up to 3 times with increasing wait intervals (8s, then 16s) before marking the track as failed.
+Providers can be added, switched, or disabled from **Settings → AI Providers**. Only one is active at a time. LexiTag retries on 429/503 errors with exponential backoff (8 s, 16 s) before marking a track as failed.
 
 ---
 
-## Audio Player
+## Changelog
 
-The built-in player supports:
-- MP3, FLAC, WAV, M4A/ALAC, OGG
-- Seeking via HTTP Range Requests (browser-native)
-- Volume control and playback progress
-- Inline streaming (not treated as a download by the browser)
+See [CHANGELOG.md](CHANGELOG.md) for the full version history with categorized changes.
 
-FLAC files are served with the `audio/flac` MIME type for maximum browser compatibility.
-
----
-
-## Library Management
-
-Source directories are managed from **Settings > Library Sources**. You can:
-- Add multiple paths (useful for multi-drive setups)
-- Enable or disable a source without removing it
-- Trigger a full scan or a status-only refresh per source
-
-The scanner skips disabled sources entirely. When a file is renamed during a fix, the database path is updated automatically.
-
----
-
-## History and Revert
-
-Every change made by LexiTag (AI fix, manual edit, bulk update) is recorded in the history table with:
-- Timestamp
-- Changed fields with before and after values
-- Batch ID to group related changes together
-
-From the History view, you can:
-- View a diff for any change
-- Revert a single field change
-- Revert an entire track to its pre-fix state
-- Revert an entire batch at once
-
----
-
-## Batch Processing
-
-Batch fixes run as background tasks. You can:
-- Queue an AI fix, lyrics-only, local-only, or filename-only fix for any selection
-- Monitor progress in real time via the progress panel
-- Abort at any time — completed tracks are saved, the aborted track is not
-- Dismiss the progress panel or force-clear it with "Stop & Clear" if it gets stuck
-
-The batch engine retries on API failures and soft-skips tracks the AI cannot identify (e.g., personal recordings with no external metadata available).
-
----
-
-## Periodic Auto-Scan Scheduler
-
-LexiTag features an automated background library scanner that keeps your music database synchronized with on-disk changes without manual intervention:
-- **Enable / Disable**: Toggle the automated scanner on or off directly from the **Settings → System Config** tab.
-- **Preset Timings**: Choose from standard intervals (`Every 1 Hour`, `Every 6 Hours`, `Every 12 Hours`, `Every 24 Hours (Daily)`, `Every 7 Days (Weekly)`).
-- **Custom Intervals**: Define your own custom recurring scan frequency down to the exact number of minutes or hours.
-- **Live Countdown & Status**: View the real-time countdown to the next scheduled scan and the timestamp of the last successful automated scan.
-- **Non-blocking Execution**: Auto-scans run asynchronously in the background and prevent duplicate scans if another job or manual scan is already running.
-
----
-
-## Release Notes
-
-### v0.1.8 (2026-09-11)
-- **Album Art Gallery**: New full-page Album Art Gallery with group-by-album and flat-track views, multi-select checkboxes, bulk Apply / Remove operations, and a per-album or per-track override workflow.
-- **Artwork Research Agent**: AI-powered cover art search using Gemini Google Search Grounding across Apple Music, Spotify, Deezer, Discogs, Wikipedia, MusicBrainz, and Cover Art Archive — with exact album/year matching and source-ranked scoring.
-- **One-Click Broad Search**: Added a dedicated "Broad Search" button to search artist and composer discographies and related artwork across sources without requiring manual text prompts.
-- **Media Server Artwork Synchronization (Navidrome & Jellyfin)**: Cover art embedding now automatically writes and overwrites folder-level image files (`cover.jpg`, `cover.png`, `folder.jpg`, `folder.png`) alongside embedded audio tags, ensuring external media servers immediately display newly applied artwork without caching conflicts.
-- **Apple Music / iTunes API Integration Hardening**: Resolved `ContentTypeError` when parsing Apple iTunes Search API responses by handling `text/javascript` content types, unlocking reliable 1200x1200 master artwork retrieval.
-- **Hallucinated Image URL Rejection**: Hardened artwork validation to strictly filter out dead 404 image URLs from AI search grounding, ensuring only verified, accessible image assets are presented and applied.
-- **Reactive Image Preview Fallback**: Replaced imperative DOM error injection with reactive state fallbacks, preventing distorted or crooked previews for CORS-restricted source URLs.
-- **Bounded LRU Image Cache**: Client-side LRU cache with configurable maximum size prevents browser memory bloat while keeping recently viewed artwork instantly available without server round-trips.
-- **Instant Hover Track Previews & 1-Click Morphing Sync**: Hovering over numbered track pills on a group card displays the track's artwork in the card preview, with a direct "Sync to Album" button on the image overlay and a morphing sync icon right on the hovered track pill for instant 1-click artwork synchronization without having to expand the tracks drawer.
-- **SSRF Protection in `download_image`**: Added strict `http://`/`https://` URL scheme validation before fetching any AI-supplied image URL, preventing local file inclusion or protocol-smuggling attacks.
-- **Production Log Hardening**: Downgraded `async_upnp_client` logger from `DEBUG` to `INFO` so verbose UPnP wire traces are suppressed in production container logs.
-- **UI Alignment Polish**: Standardised group card action buttons (Edit / Sync / AI Pull) to matching outline icons (`strokeWidth="2.5"`, `w-3.5 h-3.5`), unified height (`h-7.5`), and `inline-flex items-center justify-center` layout for pixel-perfect alignment.
-- **User-Agent Version Sync**: Bumped all outgoing HTTP `User-Agent` headers across `cover_art_service.py`, `upnp.py`, and `main.py` to reflect `LexiTag/0.1.8`.
-
-### v0.1.7 (2026-09-01)
-- **Automatic Multi-Screen & Mobile Optimization**: Complete responsive redesign of navigation header, search bar, filter chips with horizontal scrolling, metadata edit modals, bottom player bar, and history views to seamlessly adapt across mobile phones, tablets, laptops, and ultra-wide displays.
-- **Enhanced Typography Brightness & Text Contrast**: Significantly boosted global text brightness, badge contrast, and input readability (`ink.rich`, `ink.normal`, `ink.muted`) for maximum visual clarity on dark background themes.
-- **Periodic Background Library Auto-Scanner**: Introduced singleton `AutoScanScheduler` background service with configurable standard presets (1h, 6h, 12h, 24h, 7d) and custom minute/hour intervals, alongside live next-scan timers in the System Config settings.
-- **Persistent Deletion Fix**: Fixed issue where manually erasing metadata tags or lyrics in the track editor was not saving the cleared state to disk tags.
-
-### v0.1.6 (2026-08-22)
-- **Metadata Protection Engine**: Guaranteed that manual edits and existing track metadata (title, artist, album, year, composer) are never erased or blanked out during AI Fix operations.
-- **Backward History Revert System**: Fixed track revert logic to inspect prior tag history records and recover earlier non-empty metadata even if prior runs recorded empty states.
-- **System Logs & Live Debug Mode**: Added persistent server log rotation (`data/lexitag.log`), runtime `DEBUG`/`INFO` log toggle endpoint (`/api/settings/logs/toggle`), direct log file attachment download endpoint (`/api/settings/logs/download`), and an interactive terminal log viewer in the Settings panel.
-- **Universal Google Search Grounded Lyrics**: Enabled Gemini Google Search Grounding fallback for regional, Indian, and Tamil songs when LRCLIB has no match. Updated query generator to operate flexibly even when artist tags are absent.
-- **Enhanced WAV & USLT Tag Parsing**: Fixed Mutagen `USLT.text` extraction and added explicit `ID3(filepath)` container scanning for `.wav` files to ensure 100% reliable lyrics reading from disk.
-- **Track Edit Modal Lyrics Fallback**: Enhanced `/api/tracks/{id}/lyrics` endpoint to fallback to `tag_history` whenever disk scanner returns empty text, guaranteeing lyrics populate in the UI edit modal.
-
-### v0.1.5 (2026-08-21)
-- Fixed missing `language` column in background scanner SQL `INSERT` and `UPDATE` queries.
-- Enhanced multi-format language tag extraction for ID3 (`TLAN`, `TXXX:Language`), FLAC (`language`, `lang`, `tlan`), and MP4 (`\xa9lan`).
-- Added standalone **Language** column to library table UI with sorting, column manager toggling, and re-ordering support.
-- Fixed history revert routine to properly restore physical audio file tags and database records across all metadata attributes (title, artist, album, genre, year, composer, comment, lyrics, language, and raw tags).
-- Audited and updated all frontend and backend dependencies to eliminate security vulnerabilities (0 npm audit vulnerabilities).
-
-### v0.1.4 (2026-06-09)
-- Hardened Docker image to run securely as a non-root user (`lexitag`).
-- Implemented cross-compilation fixes for reliable Apple Silicon (arm64) to Intel (amd64) server deployments.
-- Upgraded multiple vulnerable frontend dependencies.
-
-### v0.1.3 (2026-05-15)
-- Removed insecure `LEXITAG_MASTER_KEY` fallback authentication system to eliminate backdoor vulnerabilities.
-- Implemented strict directory path jailing (`validate_path`) to prevent arbitrary file read/write access.
-- Removed left-over debug and test scripts.
-
-### v0.1.2 (2026-03-20)
-- Added 3-attempt retry with exponential backoff for AI provider overload errors.
-- Implemented double-cleaning to prevent junk re-injection from AI search results.
-- Fixed FLAC browser playback by switching to `FileResponse` with `audio/flac` MIME type.
-- Fixed manual bulk edits for Language and Lyrics not being written to disk.
-- Fixed progress bar showing full batch count on manual abort.
-- Added HH:MM:SS elapsed timer for long-running batches.
-- Added "Stop & Clear" button to allow UI recovery when a job hangs.
-- Scanner now respects the enabled/disabled state of library sources.
-- Fixed overly aggressive junk pattern that removed artist names containing "Gaana".
-- Changed ports to 3010 (frontend), 3020 (backend), 3030 (Docker).
+**Latest: [v0.1.8](CHANGELOG.md#0180--2026-09-11)** — Album Art Gallery, AI Artwork Research Agent, 1-click Morphing Sync, Media Server Sync (Navidrome/Jellyfin), SSRF protection, and more.
