@@ -688,8 +688,10 @@ def _write_flac(filepath: str, tags: dict, lyrics: str, language: str, raw_tags:
     return True
 
 
-def _write_mp4(filepath: str, tags: dict, lyrics: str, language: str, raw_tags: dict) -> bool:
+def _write_mp4(filepath: str, tags: dict, lyrics: str, language: str, raw_tags: dict = None) -> bool:
     """Write tags to an MP4/M4A file."""
+    from mutagen.mp4 import MP4, MP4FreeForm
+    raw_tags = raw_tags or {}
     audio = MP4(filepath)
     if audio.tags is None:
         audio.add_tags()
@@ -737,7 +739,7 @@ def _write_mp4(filepath: str, tags: dict, lyrics: str, language: str, raw_tags: 
         lang_code = _get_lang_code(language)
         audio["\xa9lan"] = [lang_code]
         if len(language) > 3:
-            audio["----:com.apple.iTunes:Language"] = [language.encode('utf-8')]
+            audio["----:com.apple.iTunes:Language"] = [MP4FreeForm(language.encode('utf-8'))]
             
     v_comp = tags.get("composer") if tags.get("composer") is not None else raw_tags.get("\xa9wrt")
     if v_comp is not None: audio["\xa9wrt"] = [_flatten_tag(v_comp)]
@@ -750,8 +752,6 @@ def _write_mp4(filepath: str, tags: dict, lyrics: str, language: str, raw_tags: 
         standard_keys = {"\xa9nam", "\xa9ART", "\xa9alb", "\xa9gen", "\xa9day", "\xa9lyr", "\xa9lan", "\xa9wrt", "\xa9cmt"}
         ID3_SYNONYMS = {"TIT2", "TPE1", "TALB", "TCON", "TDRC", "TCOM", "TLAN", "USLT", "COMM"}
         for key, val in raw_tags.items():
-            # If we're writing a new value, skip standard mapped frames to avoid double-writes
-            # But if we're DELETING (val is empty), allow purging standard frames too!
             is_deletion = val == "" or val == [] or val is None
             if not is_deletion:
                 if key in standard_keys or key in ID3_SYNONYMS or key == "suggested_filename":
@@ -769,14 +769,12 @@ def _write_mp4(filepath: str, tags: dict, lyrics: str, language: str, raw_tags: 
                 
             try:
                 if key.startswith("----"):
-                    # Handle raw byte lists natively
                     if isinstance(val, list):
                         safe_val = []
                         for v in val:
                             vf = _flatten_tag(v)
-                            # Remove literal b'' encapsulation from stringified repr
                             if vf.startswith("b'") and vf.endswith("'"): vf = vf[2:-1]
-                            if vf: safe_val.append(vf.encode("utf-8"))
+                            if vf: safe_val.append(MP4FreeForm(vf.encode("utf-8")))
                         if not safe_val:
                             if key in audio: del audio[key]
                         else:
@@ -785,7 +783,7 @@ def _write_mp4(filepath: str, tags: dict, lyrics: str, language: str, raw_tags: 
                         vf = _flatten_tag(val)
                         if vf.startswith("b'") and vf.endswith("'"): vf = vf[2:-1]
                         if vf:
-                            audio[key] = [vf.encode("utf-8")]
+                            audio[key] = [MP4FreeForm(vf.encode("utf-8"))]
                         elif key in audio:
                             del audio[key]
                 else:
@@ -822,3 +820,170 @@ def _write_generic(filepath: str, tags: dict, lyrics: str, language: str, raw_ta
 
     audio.save()
     return True
+
+
+def embed_cover_art(filepath: str, image_bytes: bytes, mime_type: str = "image/jpeg") -> bool:
+    """Embed cover art into audio file across MP3, FLAC, M4A, WAV, and OGG formats."""
+    if not os.path.exists(filepath):
+        return False
+
+    ext = Path(filepath).suffix.lower()
+
+    # Auto-detect mime_type if possible
+    if image_bytes.startswith(b"\x89PNG"):
+        mime_type = "image/png"
+    elif image_bytes.startswith(b"\xff\xd8"):
+        mime_type = "image/jpeg"
+    elif image_bytes.startswith(b"RIFF") and b"WEBP" in image_bytes[:16]:
+        mime_type = "image/webp"
+
+    try:
+        if ext in {".mp3"}:
+            from mutagen.id3 import ID3, APIC
+            try:
+                id3 = ID3(filepath)
+            except Exception:
+                id3 = ID3()
+            id3.delall("APIC")
+            id3.add(APIC(
+                encoding=3,
+                mime=mime_type,
+                type=3,  # Cover (front)
+                desc="Cover",
+                data=image_bytes
+            ))
+            id3.save(filepath, v2_version=3)
+            return True
+
+        elif ext == ".flac":
+            from mutagen.flac import FLAC, Picture
+            audio = FLAC(filepath)
+            audio.clear_pictures()
+            pic = Picture()
+            pic.type = 3  # Front cover
+            pic.mime = mime_type
+            pic.desc = "Front Cover"
+            pic.data = image_bytes
+            audio.add_picture(pic)
+            audio.save()
+            return True
+
+        elif ext in {".m4a", ".mp4", ".aac", ".alac"}:
+            from mutagen.mp4 import MP4, MP4Cover
+            audio = MP4(filepath)
+            covr_format = MP4Cover.FORMAT_PNG if mime_type == "image/png" else MP4Cover.FORMAT_JPEG
+            audio["covr"] = [MP4Cover(image_bytes, imageformat=covr_format)]
+            audio.save()
+            return True
+
+        elif ext == ".wav":
+            from mutagen.wave import WAVE
+            from mutagen.id3 import APIC
+            try:
+                wave = WAVE(filepath)
+                if wave.tags is None:
+                    try:
+                        wave.add_tags()
+                    except Exception as e:
+                        logger.warning(f"Error adding ID3 tag chunk to WAV {filepath}: {e}")
+                if wave.tags is not None:
+                    wave.tags.delall("APIC")
+                    wave.tags.add(APIC(
+                        encoding=3,
+                        mime=mime_type,
+                        type=3,
+                        desc="Cover",
+                        data=image_bytes
+                    ))
+                    wave.save()
+                    return True
+            except Exception as e:
+                logger.warning(f"Error embedding cover art into WAV {filepath}: {e}")
+                # Fallback: save cover.jpg into folder so players and LexiTag can find it
+                try:
+                    parent_dir = Path(filepath).parent
+                    cover_target = parent_dir / ("cover.png" if mime_type == "image/png" else "cover.jpg")
+                    with open(cover_target, "wb") as f:
+                        f.write(image_bytes)
+                    return True
+                except Exception as fe:
+                    logger.warning(f"Error saving folder cover fallback for WAV {filepath}: {fe}")
+
+        elif ext in {".ogg", ".opus"}:
+            from mutagen.flac import Picture
+            import base64
+            audio = MutagenFile(filepath)
+            if audio is not None:
+                pic = Picture()
+                pic.type = 3
+                pic.mime = mime_type
+                pic.desc = "Front Cover"
+                pic.data = image_bytes
+                audio["metadata_block_picture"] = [base64.b64encode(pic.write()).decode("ascii")]
+                audio.save()
+                return True
+
+        # Generic MutagenFile fallback
+        audio = MutagenFile(filepath)
+        if audio is not None and hasattr(audio, "tags") and audio.tags is not None:
+            if hasattr(audio.tags, "add") and hasattr(audio.tags, "delall"):
+                from mutagen.id3 import APIC
+                audio.tags.delall("APIC")
+                audio.tags.add(APIC(encoding=3, mime=mime_type, type=3, desc="Cover", data=image_bytes))
+                audio.save()
+                return True
+    except Exception as e:
+        print(f"[tagger] Error embedding cover art in {filepath}: {e}")
+        return False
+    return False
+
+
+def remove_cover_art(filepath: str) -> bool:
+    """Remove embedded cover art from audio file."""
+    if not os.path.exists(filepath):
+        return False
+    ext = Path(filepath).suffix.lower()
+    try:
+        if ext in {".mp3"}:
+            from mutagen.id3 import ID3
+            try:
+                id3 = ID3(filepath)
+                id3.delall("APIC")
+                id3.save(filepath, v2_version=3)
+                return True
+            except Exception:
+                pass
+        elif ext == ".flac":
+            from mutagen.flac import FLAC
+            audio = FLAC(filepath)
+            audio.clear_pictures()
+            audio.save()
+            return True
+        elif ext in {".m4a", ".mp4", ".aac"}:
+            from mutagen.mp4 import MP4
+            audio = MP4(filepath)
+            if "covr" in audio:
+                del audio["covr"]
+                audio.save()
+                return True
+        elif ext == ".wav":
+            from mutagen.wave import WAVE
+            try:
+                wave = WAVE(filepath)
+                if wave.tags:
+                    wave.tags.delall("APIC")
+                    wave.save()
+                    return True
+            except Exception:
+                pass
+        elif ext in {".ogg", ".opus"}:
+            audio = MutagenFile(filepath)
+            if audio and "metadata_block_picture" in audio:
+                del audio["metadata_block_picture"]
+                audio.save()
+                return True
+    except Exception as e:
+        print(f"[tagger] Error removing cover art from {filepath}: {e}")
+        return False
+    return False
+

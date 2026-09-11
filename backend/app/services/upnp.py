@@ -41,7 +41,7 @@ class RobustRawRequester(UpnpRequester):
             path += "?" + parsed.query
 
         headers = {
-            "User-Agent": "LexiTag/0.1.7 UPnP/1.1",
+            "User-Agent": "LexiTag/0.1.8 UPnP/1.1",
             "Accept": "*/*",
             "Connection": "close",
             **self._headers,

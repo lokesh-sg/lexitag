@@ -18,6 +18,7 @@ class TrackBase(BaseModel):
     duration: float = 0.0
     bitrate: int = 0
     has_lyrics: bool = False
+    has_cover: bool = False
     language: str = ""
     has_junk: bool = False
     format: str = ""
@@ -29,6 +30,37 @@ class TrackBase(BaseModel):
     last_fix_type: Optional[str] = None
     last_fixed_at: Optional[str] = None
     last_ai_fix_duration: float = 0.0
+
+
+class CoverSearchResponse(BaseModel):
+    image_url: str
+    source: str = ""
+    album: str = ""
+    artist: str = ""
+    description: str = ""
+    preview_url: Optional[str] = None
+
+
+class CoverSearchRequest(BaseModel):
+    query: Optional[str] = None
+    album: Optional[str] = None
+    artist: Optional[str] = None
+    year: Optional[str] = None
+    prompt: Optional[str] = None
+
+
+class CoverApplyRequest(BaseModel):
+    track_ids: Optional[list[int]] = None
+    image_url: Optional[str] = None
+    base64_data: Optional[str] = None
+    mime_type: Optional[str] = None
+
+
+class GroupSyncCoverRequest(BaseModel):
+    source_track_id: Optional[int] = None
+    target_track_ids: Optional[list[int]] = None
+    group_key: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class TrackUpdateModel(BaseModel):

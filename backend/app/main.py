@@ -1,7 +1,7 @@
 """LexiTag — FastAPI entry point."""
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -31,8 +31,8 @@ file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)
 root_logger = logging.getLogger()
 root_logger.addHandler(file_handler)
 
-# Explicitly enable verbose debugging for UPnP library
-logging.getLogger('async_upnp_client').setLevel(logging.DEBUG)
+# Explicitly enable verbose debugging for UPnP library (keep INFO for production)
+logging.getLogger('async_upnp_client').setLevel(logging.INFO)
 
 from backend.app.config import settings
 
@@ -81,7 +81,7 @@ try:
     _version_path = Path(__file__).resolve().parent.parent.parent / "VERSION"
     VERSION = _version_path.read_text().strip()
 except:
-    VERSION = "0.1.7"
+    VERSION = "0.1.8"
 
 
 app = FastAPI(
@@ -126,12 +126,48 @@ async def health_check():
         "version": VERSION
     }
 
-# Serve frontend static files
+# Serve frontend static files with SPA fallback
 # In production, the Dockerfile copies built frontend to /app/static
 prod_static = Path("/app/static")
 static_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
+
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+
+class SPAStaticFiles(StaticFiles):
+    """StaticFiles handler that falls back to index.html for client-side SPA routing."""
+    async def get_response(self, path: str, scope):
+        try:
+            response = await super().get_response(path, scope)
+            if response.status_code == 404:
+                return await super().get_response("index.html", scope)
+            return response
+        except (StarletteHTTPException, HTTPException) as exc:
+            if exc.status_code == 404:
+                return await super().get_response("index.html", scope)
+            raise
+
+
+@app.exception_handler(StarletteHTTPException)
+async def spa_fallback_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404 and not request.url.path.startswith("/api/"):
+        index_file = prod_static / "index.html" if prod_static.exists() else static_dir / "index.html"
+        if index_file.is_file():
+            return FileResponse(index_file)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(404)
+async def spa_404_handler(request: Request, exc):
+    if not request.url.path.startswith("/api/"):
+        index_file = prod_static / "index.html" if prod_static.exists() else static_dir / "index.html"
+        if index_file.is_file():
+            return FileResponse(index_file)
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+
 if prod_static.exists():
-    app.mount("/", StaticFiles(directory=str(prod_static), html=True), name="static")
+    app.mount("/", SPAStaticFiles(directory=str(prod_static), html=True), name="static")
 elif static_dir.exists():
-    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+    app.mount("/", SPAStaticFiles(directory=str(static_dir), html=True), name="static")

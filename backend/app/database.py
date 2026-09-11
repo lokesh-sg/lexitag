@@ -124,6 +124,7 @@ async def _run_migrations(db: aiosqlite.Connection):
     await _safe_add_column(db, "tracks", "last_ai_fix_duration", "REAL DEFAULT 0")
     await _safe_add_column(db, "tracks", "bitrate", "INTEGER DEFAULT 0")
     await _safe_add_column(db, "tracks", "is_missing", "INTEGER DEFAULT 0")
+    await _safe_add_column(db, "tracks", "has_cover", "INTEGER DEFAULT 0")
 
     await _safe_add_column(db, "tag_history", "duration_seconds", "REAL DEFAULT 0")
 
@@ -136,6 +137,7 @@ async def _run_migrations(db: aiosqlite.Connection):
         CREATE INDEX IF NOT EXISTS idx_tracks_fixed ON tracks(last_fixed_at);
         CREATE INDEX IF NOT EXISTS idx_tracks_junk ON tracks(has_junk);
         CREATE INDEX IF NOT EXISTS idx_tracks_lyrics ON tracks(has_lyrics);
+        CREATE INDEX IF NOT EXISTS idx_tracks_cover ON tracks(has_cover);
         
         CREATE INDEX IF NOT EXISTS idx_history_track ON tag_history(track_id);
         CREATE INDEX IF NOT EXISTS idx_history_path ON tag_history(track_path COLLATE NOCASE);

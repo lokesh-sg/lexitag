@@ -59,11 +59,12 @@ archive:
 docker-build:
 	docker compose build
 
-## docker-build-amd64: Build amd64 image, save timestamped tarball, and copy to /Volumes/Downloads-1/LexiTag/
+## docker-build-amd64: Build amd64 image, save timestamped tarball, and copy to /Volumes/Downloads/LexiTag/
 docker-build-amd64:
 	@TS=$$(date +%Y%m%d_%H%M); \
 	VER=$$(cat $(VERSION_FILE)); \
-	DEST="/Volumes/Downloads-1/LexiTag"; \
+	DEST="/Volumes/Downloads/LexiTag"; \
+	[ ! -d "$$DEST" ] && [ -d "/Volumes/Downloads-1/LexiTag" ] && DEST="/Volumes/Downloads-1/LexiTag"; \
 	echo "🐳 Building linux/amd64 image for v$$VER (Build $$TS)..."; \
 	docker buildx build --platform linux/amd64 -t lokeshsg/lexitag:v$$VER -t lokeshsg/lexitag:latest -t lokeshsg/lexitag:prod --load . && \
 	mkdir -p backups && \

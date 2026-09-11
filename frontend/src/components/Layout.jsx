@@ -18,7 +18,7 @@ export default function Layout({ children }) {
       .then(data => {
         if (data.version) setVersion('v' + data.version);
       })
-      .catch(() => setVersion('v0.1.7'));
+      .catch(() => setVersion('v0.1.8'));
   }, []);
 
   React.useEffect(() => {
@@ -74,6 +74,25 @@ export default function Layout({ children }) {
                   <circle cx="18" cy="16" r="3" />
                 </svg>
                 <span>Library</span>
+              </span>
+            </NavLink>
+            <NavLink
+              to="/album-art"
+              className={({ isActive }) =>
+                `px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 ${
+                  isActive
+                    ? 'bg-surface-3 text-amber-400 shadow-sm'
+                    : 'text-ink-muted hover:text-ink-rich hover:bg-surface-3/50'
+                }`
+              }
+            >
+              <span className="flex items-center gap-1.5 sm:gap-2">
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <span>Album Art</span>
               </span>
             </NavLink>
             <NavLink

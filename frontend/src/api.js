@@ -54,6 +54,19 @@ export async function fetchTracks({ page = 1, pageSize = 50, search = '', search
     return data;
 }
 
+export async function fetchTrackGroups({ groupBy = 'album', page = 1, pageSize = 48, search = '', filter = '' } = {}) {
+    const { data } = await api.get('/tracks/groups', {
+        params: {
+            group_by: groupBy,
+            page,
+            page_size: pageSize,
+            search,
+            filter,
+        },
+    });
+    return data;
+}
+
 export async function fetchTrack(trackId) {
     const { data } = await api.get(`/tracks/${trackId}`);
     return data;
@@ -344,6 +357,65 @@ export async function fetchAutoScanSettings() {
 
 export async function updateAutoScanSettings(config) {
     const { data } = await api.post('/settings/auto-scan', config);
+    return data;
+}
+
+// ── Album Cover Art ──
+
+export async function searchAiCover(trackId, params = {}) {
+    const { data } = await api.post(`/tracks/${trackId}/cover/search-ai`, params);
+    return data;
+}
+
+export async function applyTrackCover(trackId, { imageUrl, base64Data, mimeType } = {}) {
+    const { data } = await api.post(`/tracks/${trackId}/cover/apply`, {
+        image_url: imageUrl,
+        base64_data: base64Data,
+        mime_type: mimeType,
+    });
+    return data;
+}
+
+export async function batchAiCover(trackIds, imageUrl = null) {
+    const { data } = await api.post('/tracks/batch/cover/search-ai', {
+        track_ids: trackIds,
+        image_url: imageUrl,
+    });
+    return data;
+}
+
+export async function deleteTrackCover(trackId) {
+    const { data } = await api.delete(`/tracks/${trackId}/cover`);
+    return data;
+}
+
+export async function syncFolderCoverArt({ trackIds = null, embed = false } = {}) {
+    const { data } = await api.post('/tracks/batch/cover/sync-folder-art', {
+        track_ids: trackIds,
+        embed,
+    }, {
+        timeout: 180000, // 3 minutes timeout for library-wide folder scanning
+    });
+    return data;
+}
+
+export async function syncGroupCover({ sourceTrackId = null, targetTrackIds = [], groupKey = null, imageUrl = null } = {}) {
+    const { data } = await api.post('/tracks/groups/sync-cover', {
+        source_track_id: sourceTrackId,
+        target_track_ids: targetTrackIds,
+        group_key: groupKey,
+        image_url: imageUrl,
+    });
+    return data;
+}
+
+export function getTrackCoverUrl(trackId, timestamp = null) {
+    if (!trackId) return '';
+    return `/api/tracks/${trackId}/cover${timestamp ? `?t=${timestamp}` : ''}`;
+}
+
+export async function batchRemoveCover(trackIds = []) {
+    const { data } = await api.post('/tracks/batch/cover/remove', { track_ids: trackIds });
     return data;
 }
 

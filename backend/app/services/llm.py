@@ -167,7 +167,13 @@ async def _call_gemini_native(provider: dict, system_prompt: str, user_message: 
     }
 
     if tools:
-        payload["tools"] = tools
+        normalized_tools = []
+        for t in tools:
+            if isinstance(t, dict) and "google_search" in t:
+                normalized_tools.append({"googleSearch": t["google_search"]})
+            else:
+                normalized_tools.append(t)
+        payload["tools"] = normalized_tools
 
     async with aiohttp.ClientSession(timeout=_TIMEOUT) as session:
         async with session.post(url, headers=headers, json=payload) as resp:
@@ -393,19 +399,27 @@ async def fetch_models(provider_id: int) -> list[str]:
 
 
 async def chat_completion(
-    system_prompt: str,
-    user_message: str,
+    system_prompt: str = "",
+    user_message: str = "",
     temperature: float = 0.1,
     max_tokens: int = 1024,
     retries: int = 3,
     on_retry: callable = None,
     tools: list = None,
+    messages: list = None,
 ) -> str:
     """
     Send a chat completion request using the active provider from DB.
     Falls back to .env config if no provider is configured.
     Includes automatic retry for 429 (rate limit) errors.
     """
+    if messages:
+        for m in messages:
+            if m.get("role") == "system":
+                system_prompt = m.get("content", "")
+            elif m.get("role") == "user":
+                user_message = m.get("content", "")
+
     provider = await _get_active_provider()
     if not provider:
         raise RuntimeError("No LLM provider configured. Add one in Settings.")

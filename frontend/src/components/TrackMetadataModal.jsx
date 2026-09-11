@@ -1,15 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { fetchRawTags, updateTracks, fetchHistory, fetchTrack } from '../api';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  fetchRawTags, updateTracks, fetchHistory, fetchTrack,
+  searchAiCover, applyTrackCover, deleteTrackCover, getTrackCoverUrl, batchAiCover, batchRemoveCover,
+  syncGroupCover
+} from '../api';
 import { useFixerContext } from '../contexts/AppContext';
 import HistoryDiffModal from './HistoryDiffModal';
+import ConfirmDialog from './ConfirmDialog';
 
-export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
+export default function TrackMetadataModal({ tracks, onClose, onUpdated, initialAction = null }) {
   const fixer = useFixerContext();
+  const hasTriggeredInitialAction = useRef(false);
   const [loading, setLoading] = useState(true);
   const [rawTags, setRawTags] = useState({});
   const [history, setHistory] = useState([]);
   const [isAuditing, setIsAuditing] = useState(false);
   const [selectedHistoryEntry, setSelectedHistoryEntry] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    confirmVariant: 'danger',
+    onConfirm: null
+  });
   const [formData, setFormData] = useState({
     title: '', artist: '', album: '', genre: '', year: '', 
     composer: '', comment: '', lyrics: '', language: '',
@@ -26,7 +40,29 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
   const [newTagKey, setNewTagKey] = useState("");
   const [newTagValue, setNewTagValue] = useState("");
 
+  // Cover Art state
+  const [coverTimestamp, setCoverTimestamp] = useState(Date.now());
+  const [coverLoading, setCoverLoading] = useState(false);
+  const [coverError, setCoverError] = useState(null);
+  const [coverSuccess, setCoverSuccess] = useState(false);
+  const [aiCoverCandidate, setAiCoverCandidate] = useState(null);
+  const [showCoverModal, setShowCoverModal] = useState(false);
+  const [selectedCandidateIndex, setSelectedCandidateIndex] = useState(0);
+  const [agentPrompt, setAgentPrompt] = useState("");
+  const [agentCustomAlbum, setAgentCustomAlbum] = useState("");
+  const [agentCustomYear, setAgentCustomYear] = useState("");
+  const [agentCustomArtist, setAgentCustomArtist] = useState("");
+  const [agentSearching, setAgentSearching] = useState(false);
+  const [showAgentRefine, setShowAgentRefine] = useState(false);
+  const [agentError, setAgentError] = useState(null);
+  const [candImageErrors, setCandImageErrors] = useState({});
+  const [coverLoaded, setCoverLoaded] = useState(false);
+  const [coverFailed, setCoverFailed] = useState(false);
+  const fileInputRef = useRef(null);
+
   const isBulk = tracks.length > 1;
+  const repTrack = tracks.find(t => t.has_cover) || tracks[0];
+  const hasAnyCover = tracks.some(t => t.has_cover);
 
   const trackIdsKey = tracks.map(t => t.id).join(',');
 
@@ -101,6 +137,15 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
       console.error("Failed to refresh modal data", err);
     } finally {
       setLoading(false);
+      if (initialAction === 'cover-ai' && !hasTriggeredInitialAction.current && tracks.length) {
+        hasTriggeredInitialAction.current = true;
+        const initialParams = isBulk ? null : {
+          album: tracks[0]?.album || '',
+          artist: tracks[0]?.artist || '',
+          year: tracks[0]?.year || '',
+        };
+        handlePullAiCover(initialParams);
+      }
     }
   };
 
@@ -188,7 +233,7 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
       onUpdated && onUpdated();
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err) {
-      setError(err.message || 'Failed to save tags');
+      setError(err.response?.data?.detail || err.message || 'Failed to save tags');
     } finally {
       setSaving(false);
     }
@@ -232,6 +277,196 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
     fixer.fix(trackIds, { filenames_only: true }, () => {
       loadData();
       onUpdated && onUpdated();
+    });
+  };
+
+  const handlePullAiCover = async (customParams = null) => {
+    // If called from an event handler, customParams is the SyntheticEvent — ignore it
+    if (customParams && (customParams.nativeEvent || customParams.target || typeof customParams.preventDefault === 'function')) {
+      customParams = null;
+    }
+    setCoverLoading(true);
+    setCoverError(null);
+    setCandImageErrors({});
+    try {
+      const rep = tracks.find(t => t.album) || tracks[0];
+      const params = customParams || {
+        album: formData.album || rep?.album || "",
+        artist: formData.artist || rep?.artist || "",
+        year: formData.year || rep?.year || "",
+      };
+      const res = await searchAiCover(rep.id, params);
+      if (res && res.success && res.image_url) {
+        setAiCoverCandidate(res);
+        setSelectedCandidateIndex(0);
+        setAgentCustomAlbum(formData.album || rep?.album || res.album || "");
+        setAgentCustomYear(formData.year || rep?.year || res.year || "");
+        // Do NOT overwrite user's authentic track artist with wrong candidate artist
+        const authenticArtist = formData.composer || formData.artist || rep?.composer || rep?.artist || "";
+        setAgentCustomArtist(authenticArtist);
+        setAgentPrompt("");
+        setAgentError(null);
+        setShowCoverModal(true);
+      } else {
+        // Show the interactive modal even on failure so user can use the refinement instructions
+        setAiCoverCandidate({ success: false, candidates: [], exact_match: false });
+        setSelectedCandidateIndex(0);
+        setAgentCustomAlbum(formData.album || rep?.album || "");
+        setAgentCustomYear(formData.year || rep?.year || "");
+        const authenticArtist = formData.composer || formData.artist || rep?.composer || rep?.artist || "";
+        setAgentCustomArtist(authenticArtist);
+        setAgentPrompt("");
+        setAgentError(res?.error || 'No album art found by Google AI. Try refining the search below.');
+        setShowCoverModal(true);
+        setCoverError(null);
+      }
+    } catch (err) {
+      setCoverError(err.response?.data?.detail || err.message || 'Failed to search AI cover');
+      // Show the interactive modal even on hard failures so user can use the refinement instructions or Wikipedia URL
+      setAiCoverCandidate({ success: false, candidates: [], exact_match: false });
+      setSelectedCandidateIndex(0);
+      setAgentCustomAlbum(formData.album || rep?.album || "");
+      setAgentCustomYear(formData.year || rep?.year || "");
+      const authenticArtist = formData.composer || formData.artist || rep?.composer || rep?.artist || "";
+      setAgentCustomArtist(authenticArtist);
+      setAgentPrompt("");
+      setShowCoverModal(true);
+    } finally {
+      setCoverLoading(false);
+    }
+  };
+
+  const handleAgentRefineSearch = async (e, customPromptOverride = null) => {
+    if (e) e.preventDefault();
+    if (!tracks.length) return;
+    setAgentSearching(true);
+    setAgentError(null);
+    setCandImageErrors({});
+    const promptToUse = customPromptOverride !== null ? customPromptOverride : agentPrompt;
+    try {
+      const rep = tracks.find(t => t.album) || tracks[0];
+      const res = await searchAiCover(rep.id, {
+        album: agentCustomAlbum || formData.album || rep?.album,
+        artist: agentCustomArtist || formData.artist || rep?.artist,
+        year: agentCustomYear || formData.year || rep?.year,
+        prompt: promptToUse,
+      });
+      if (res && res.success && res.image_url) {
+        setAiCoverCandidate(res);
+        setSelectedCandidateIndex(0);
+        setAgentError(null);
+      } else {
+        setAgentError(res?.error || 'No matching artwork found with these criteria.');
+      }
+    } catch (err) {
+      setAgentError(err.response?.data?.detail || err.message || 'Agent search failed');
+    } finally {
+      setAgentSearching(false);
+    }
+  };
+
+  const handleBroadSearch = async () => {
+    const broadPrompt = "Search for related album, soundtrack or artist discography artwork without strict album name match";
+    setAgentPrompt(broadPrompt);
+    await handleAgentRefineSearch(null, broadPrompt);
+  };
+
+  const handleConfirmApplyCover = async (syncToAlbum = false) => {
+    const candidates = aiCoverCandidate?.candidates || [];
+    const activeCand = candidates[selectedCandidateIndex] || aiCoverCandidate;
+    const selectedUrl = activeCand?.image_url;
+    if (!selectedUrl) return;
+    setCoverLoading(true);
+    try {
+      if (syncToAlbum && tracks[0]?.id) {
+        // Sync cover to all tracks sharing this track's album / folder
+        await syncGroupCover({
+          sourceTrackId: tracks[0].id,
+          imageUrl: selectedUrl,
+        });
+      } else if (isBulk) {
+        for (const t of tracks) {
+          await applyTrackCover(t.id, { imageUrl: selectedUrl });
+        }
+      } else {
+        await applyTrackCover(tracks[0].id, { imageUrl: selectedUrl });
+      }
+      setCoverTimestamp(Date.now());
+      setCoverFailed(false);
+      setCoverLoaded(true);
+      setShowCoverModal(false);
+      setCoverSuccess(true);
+      setTimeout(() => setCoverSuccess(false), 3000);
+      onUpdated && onUpdated();
+      if (onClose) onClose(); // Auto-close editor as requested by user
+    } catch (err) {
+      setCoverError(err.response?.data?.detail || err.message || 'Failed to apply cover');
+    } finally {
+      setCoverLoading(false);
+    }
+  };
+
+  const handleUploadCoverFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      setCoverLoading(true);
+      setCoverError(null);
+      try {
+        const base64Data = reader.result;
+        if (isBulk) {
+          for (const t of tracks) {
+            await applyTrackCover(t.id, { base64Data });
+          }
+        } else {
+          await applyTrackCover(tracks[0].id, { base64Data });
+        }
+        setCoverTimestamp(Date.now());
+        setCoverFailed(false);
+        setCoverLoaded(true);
+        setCoverSuccess(true);
+        setTimeout(() => setCoverSuccess(false), 3000);
+        onUpdated && onUpdated();
+      } catch (err) {
+        setCoverError(err.response?.data?.detail || err.message || 'Failed to upload cover');
+      } finally {
+        setCoverLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveCover = () => {
+    const confirmMsg = isBulk 
+      ? `Remove embedded album cover art from all ${tracks.length} selected audio files?`
+      : 'Remove embedded album cover art from this audio file?';
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Embedded Cover Art',
+      message: confirmMsg,
+      confirmText: 'Remove Cover',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        setCoverLoading(true);
+        try {
+          if (isBulk) {
+            await batchRemoveCover(tracks.map(t => t.id));
+          } else {
+            await deleteTrackCover(tracks[0].id);
+          }
+          setCoverTimestamp(Date.now());
+          setCoverLoaded(false);
+          setCoverFailed(true);
+          tracks.forEach(t => { t.has_cover = false; });
+          onUpdated && onUpdated();
+        } catch (err) {
+          setCoverError(err.response?.data?.detail || err.message || 'Failed to remove cover');
+        } finally {
+          setCoverLoading(false);
+        }
+      }
     });
   };
 
@@ -291,6 +526,136 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
               <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 custom-scrollbar">
                 {/* Main Fields Form */}
                 <form id="metadata-form" onSubmit={handleSave} className="flex-1 space-y-4">
+                  {/* Album Art Hero Card */}
+                  <div className="bg-surface-2 rounded-xl p-3 sm:p-4 border border-surface-5/40 flex flex-col sm:flex-row items-center sm:items-start gap-4 transition-all">
+                    {/* Square Cover Container */}
+                    <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-surface-3 border border-surface-5/50 shrink-0 shadow-lg group">
+                      {repTrack && (
+                        <img
+                          key={`${repTrack.id}-${coverTimestamp}`}
+                          src={getTrackCoverUrl(repTrack.id, coverTimestamp)}
+                          alt="Album Art"
+                          className={`w-full h-full object-cover transition-all duration-300 ${coverFailed ? 'hidden' : 'block'}`}
+                          onLoad={() => { setCoverLoaded(true); setCoverFailed(false); }}
+                          onError={() => { setCoverLoaded(false); setCoverFailed(true); }}
+                        />
+                      )}
+                      
+                      {/* Placeholder when missing or failed */}
+                      {(coverFailed || (!hasAnyCover && isBulk) || (!coverLoaded && !isBulk)) && !coverLoading && (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-ink-muted/60 p-2 text-center bg-surface-3/80">
+                          <svg className="w-8 h-8 sm:w-10 sm:h-10 mb-1 text-ink-muted/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                          </svg>
+                          <span className="text-[10px] font-semibold text-ink-muted">
+                            {isBulk ? `${tracks.length} Tracks` : 'No Album Art'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Bulk badge overlay on image */}
+                      {isBulk && coverLoaded && !coverFailed && (
+                        <div className="absolute bottom-1 right-1 bg-black/75 backdrop-blur-xs text-[9px] font-bold text-amber-300 px-1.5 py-0.5 rounded shadow-xs border border-amber-500/20 pointer-events-none">
+                          {tracks.length} Tracks
+                        </div>
+                      )}
+
+                      {/* Loading Overlay */}
+                      {coverLoading && (
+                        <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center text-amber-400 gap-1.5 z-10 animate-fade-in">
+                          <svg className="w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                          </svg>
+                          <span className="text-[10px] font-bold tracking-tight text-ink-rich">Google AI...</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Cover Controls & Metadata */}
+                    <div className="flex-1 min-w-0 space-y-2 w-full text-center sm:text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <div>
+                          <h4 className="text-xs font-bold text-ink-rich uppercase tracking-wider">Album Artwork</h4>
+                          <p className="text-[11px] text-ink-muted truncate">
+                            {isBulk 
+                              ? `Batch apply artwork across ${tracks.length} tracks` 
+                              : (coverLoaded && !coverFailed ? 'Embedded in physical audio file' : 'No embedded artwork detected')
+                            }
+                          </p>
+                        </div>
+
+                        {coverSuccess && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 animate-fade-in self-center sm:self-auto">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                            Artwork Saved!
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handlePullAiCover()}
+                          disabled={coverLoading}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-surface-0 shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                          title="Search and pull official album artwork from internet using Google AI"
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                          </svg>
+                          <span>{isBulk ? 'Pull AI Covers (Batch)' : 'Pull AI Cover'}</span>
+                        </button>
+
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleUploadCoverFile}
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={coverLoading}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-surface-3 hover:bg-surface-4 text-ink-rich border border-surface-5/50 transition-all active:scale-95 disabled:opacity-50"
+                          title="Upload an image from your computer"
+                        >
+                          <svg className="w-3.5 h-3.5 text-ink-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                          </svg>
+                          <span>Upload Image</span>
+                        </button>
+
+                        {(isBulk || (coverLoaded && !coverFailed)) && (
+                          <button
+                            type="button"
+                            onClick={handleRemoveCover}
+                            disabled={coverLoading}
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                            title={isBulk ? `Remove embedded artwork from all ${tracks.length} tracks` : "Remove embedded artwork from audio file"}
+                          >
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="3 6 5 6 21 6"/>
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            <span>{isBulk ? `Remove All Covers (${tracks.length})` : 'Remove'}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {coverError && (
+                        <p className="text-[11px] text-red-400 bg-red-500/10 px-2.5 py-1 rounded border border-red-500/20">
+                          {coverError}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
                       { label: 'Title', name: 'title' },
@@ -432,7 +797,7 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
                                       ) : val === "__ALBUM_ART__" ? (
                                           <div className="mt-1 flex justify-center bg-surface-4/30 rounded-lg p-2 border border-surface-5/10">
                                               <img 
-                                                  src={`/api/tracks/${tracks[0].id}/cover?t=${Date.now()}`} 
+                                                  src={getTrackCoverUrl(tracks[0].id, coverTimestamp)} 
                                                   alt="Cover Art"
                                                   className="max-w-full h-auto rounded shadow-lg border border-surface-5/20 max-h-[200px] object-contain"
                                                   onError={(e) => {
@@ -547,7 +912,435 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated }) {
                 onClose={() => setSelectedHistoryEntry(null)}
             />
         )}
+
+        {/* Artwork Research Agent Modal */}
+        {showCoverModal && aiCoverCandidate && (() => {
+          const candidates = aiCoverCandidate.candidates?.length ? aiCoverCandidate.candidates : [aiCoverCandidate];
+          const activeCand = candidates[selectedCandidateIndex] || candidates[0] || aiCoverCandidate;
+          return (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+              <div className="bg-surface-1 rounded-2xl border border-surface-5/50 max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-scale-in">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-surface-5/30 px-5 py-3.5 bg-surface-2/60">
+                  <div className="flex items-center gap-2.5">
+                    <span className="p-1.5 rounded-lg bg-amber-400/10 text-amber-400">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                      </svg>
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-ink-rich">Artwork Research Agent</h3>
+                        {aiCoverCandidate.exact_match ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            Exact Match
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            Candidate Matches ({candidates.length})
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-ink-muted">Select your preferred artwork below. Final confirmation is required before embedding.</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowCoverModal(false)}
+                    className="p-1.5 rounded-lg text-ink-muted hover:text-ink-rich hover:bg-surface-3 transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+                  {/* Status Banner */}
+                  {agentError && (
+                    <div className="px-3.5 py-2.5 rounded-xl bg-red-900/20 border border-red-900/50 text-sm font-semibold text-red-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <span className="text-xs">{agentError}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleBroadSearch}
+                        disabled={agentSearching}
+                        className="px-3 py-1 rounded-lg text-xs font-bold bg-amber-400 hover:bg-amber-300 text-surface-0 border border-amber-400/40 shadow-sm transition-all flex items-center gap-1.5 shrink-0 self-end sm:self-auto"
+                      >
+                        {agentSearching ? (
+                          <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8" strokeWidth="4" className="opacity-75"/></svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>
+                        )}
+                        <span>Try Broad Search</span>
+                      </button>
+                    </div>
+                  )}
+                  {!agentError && aiCoverCandidate.exact_match && (
+                    <div className="px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Exact album match found! You can preview and apply, or run a broad search for alternatives.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleBroadSearch}
+                        disabled={agentSearching}
+                        className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 shrink-0 self-end sm:self-auto transition-colors"
+                        title="Search discography and related artwork"
+                      >
+                        <span>Want more choices? Broad Search</span>
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                    </div>
+                  )}
+                  {!agentError && !aiCoverCandidate.exact_match && (
+                    <div className="px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 shrink-0 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <span>No 100% exact match found for "{formData.album || formData.title}". Review candidates or run broad search.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleBroadSearch}
+                        disabled={agentSearching}
+                        className="px-3 py-1 rounded-lg text-xs font-bold bg-amber-400 hover:bg-amber-300 text-surface-0 border border-amber-400/40 shadow-sm transition-all flex items-center gap-1.5 shrink-0 self-end sm:self-auto"
+                      >
+                        {agentSearching ? (
+                          <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8" strokeWidth="4" className="opacity-75"/></svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>
+                        )}
+                        <span>Broad Search</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Main Preview & Details Section */}
+                  {!agentError && activeCand?.image_url && (
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-start bg-surface-2/40 p-4 rounded-xl border border-surface-5/20">
+                      <div className="sm:col-span-5 flex flex-col items-center justify-center">
+                        <div className="relative aspect-square w-full max-w-[200px] rounded-xl overflow-hidden bg-surface-3 border border-surface-5/40 shadow-lg flex items-center justify-center">
+                          {candImageErrors[activeCand.image_url] ? (
+                            <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center bg-surface-2/90">
+                              <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-2">
+                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                                  <path d="M21 15l-5-5L5 21"/>
+                                </svg>
+                              </div>
+                              <span className="text-xs font-semibold text-ink-rich">Direct Preview Unavailable</span>
+                              <span className="text-[10px] text-ink-muted mt-1 leading-tight">
+                                Source blocks browser linking. Artwork will be downloaded by server when applied.
+                              </span>
+                            </div>
+                          ) : (
+                            <img 
+                              key={activeCand.image_url}
+                              src={activeCand.image_url} 
+                              alt="Cover Preview" 
+                              className="w-full h-full object-contain"
+                              onError={() => {
+                                setCandImageErrors(prev => ({ ...prev, [activeCand.image_url]: true }));
+                              }}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-7 flex flex-col justify-between space-y-2.5">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-surface-4 text-ink-rich border border-surface-5/30">
+                              {activeCand.source || 'Music Repository'}
+                            </span>
+                            {activeCand.is_exact && (
+                              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                Exact Title
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="text-sm font-bold text-ink-rich leading-snug">
+                            {activeCand.album || formData.album || 'Unknown Album'}
+                          </h4>
+                          <p className="text-xs text-ink-muted">
+                            {activeCand.artist || formData.artist || 'Unknown Artist'}
+                            {activeCand.year ? ` • ${activeCand.year}` : ''}
+                          </p>
+                          {activeCand.description && (
+                            <p className="text-[11px] text-ink-faint mt-1.5 italic">
+                              {activeCand.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="bg-surface-3/60 rounded-lg p-2.5 text-[11px] space-y-1 text-ink-muted border border-surface-5/20">
+                          <div className="flex justify-between">
+                            <span className="text-ink-faint">Target Track:</span>
+                            <span className="text-ink-rich font-medium truncate ml-2">{formData.title || tracks[0]?.filename}</span>
+                          </div>
+                          {formData.composer && (
+                            <div className="flex justify-between">
+                              <span className="text-ink-faint">Composer:</span>
+                              <span className="text-ink-rich font-medium truncate ml-2">{formData.composer}</span>
+                            </div>
+                          )}
+                          {formData.language && (
+                            <div className="flex justify-between">
+                              <span className="text-ink-faint">Language:</span>
+                              <span className="text-ink-rich font-medium truncate ml-2">{formData.language}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Candidate Selector Strip */}
+                  {candidates.length > 1 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-ink-rich flex items-center gap-1.5">
+                          <span>Candidate Options ({candidates.length})</span>
+                          <span className="text-[10px] font-normal text-ink-muted">(Click to select)</span>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {candidates.map((cand, idx) => {
+                          const isSelected = selectedCandidateIndex === idx;
+                          return (
+                            <div 
+                              key={cand.id || idx}
+                              onClick={() => setSelectedCandidateIndex(idx)}
+                              className={`p-2 rounded-xl border transition-all cursor-pointer flex flex-col gap-2 relative ${
+                                isSelected 
+                                  ? 'bg-amber-400/10 border-amber-400 ring-2 ring-amber-400/40 shadow-md' 
+                                  : 'bg-surface-2/60 border-surface-5/20 hover:border-surface-5/50 hover:bg-surface-2'
+                              }`}
+                            >
+                              <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-surface-3 flex items-center justify-center">
+                                {candImageErrors[cand.image_url] ? (
+                                  <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-surface-2 text-ink-faint">
+                                    <svg className="w-5 h-5 mb-1 opacity-60 text-amber-400/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                                      <path d="M21 15l-5-5L5 21"/>
+                                    </svg>
+                                    <span className="text-[9px] text-ink-muted">No Preview</span>
+                                  </div>
+                                ) : (
+                                  <img 
+                                    src={cand.image_url} 
+                                    alt={`Option ${idx + 1}`} 
+                                    className="w-full h-full object-contain"
+                                    onError={() => {
+                                      setCandImageErrors(prev => ({ ...prev, [cand.image_url]: true }));
+                                    }}
+                                  />
+                                )}
+                                {isSelected && (
+                                  <div className="absolute top-1 right-1 p-0.5 rounded-full bg-amber-400 text-surface-0 shadow">
+                                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0 text-left">
+                                <span className="text-[9px] font-bold block truncate text-amber-400 uppercase tracking-tight">
+                                  {cand.source?.replace(/\(.*\)/, '') || 'Candidate'}
+                                </span>
+                                <p className="text-[11px] font-semibold text-ink-rich truncate">
+                                  {cand.album}
+                                </p>
+                                <p className="text-[10px] text-ink-muted truncate">
+                                  {cand.year ? `${cand.year} • ` : ''}{cand.artist}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Agent Refinement Box ("Tell the agent to look for different one") */}
+                  <div className="border border-surface-5/20 rounded-xl overflow-hidden bg-surface-2/30">
+                    <button
+                      type="button"
+                      onClick={() => setShowAgentRefine(!showAgentRefine)}
+                      className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs font-semibold text-ink-muted hover:text-ink-rich hover:bg-surface-3/40 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <svg className="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        <span>Not satisfied? Tell agent to search for a different release / metadata</span>
+                      </div>
+                      <span className="text-[10px] text-amber-400 font-bold uppercase">{showAgentRefine ? 'Hide' : 'Refine'}</span>
+                    </button>
+
+                    {showAgentRefine && (
+                      <form onSubmit={handleAgentRefineSearch} className="p-3.5 border-t border-surface-5/20 space-y-3 bg-surface-1/40">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          <div>
+                            <label className="text-[10px] font-bold text-ink-faint uppercase">Album Name</label>
+                            <input 
+                              type="text" 
+                              value={agentCustomAlbum} 
+                              onChange={(e) => setAgentCustomAlbum(e.target.value)}
+                              placeholder="Album title"
+                              className="w-full mt-1 px-2.5 py-1.5 rounded-lg bg-surface-2 border border-surface-5/30 text-xs text-ink-rich focus:border-amber-400 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-ink-faint uppercase">Release Year</label>
+                            <input 
+                              type="text" 
+                              value={agentCustomYear} 
+                              onChange={(e) => setAgentCustomYear(e.target.value)}
+                              placeholder="Release year (YYYY)"
+                              className="w-full mt-1 px-2.5 py-1.5 rounded-lg bg-surface-2 border border-surface-5/30 text-xs text-ink-rich focus:border-amber-400 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-ink-faint uppercase">Artist / Composer</label>
+                            <input 
+                              type="text" 
+                              value={agentCustomArtist} 
+                              onChange={(e) => setAgentCustomArtist(e.target.value)}
+                              placeholder="Artist or composer"
+                              className="w-full mt-1 px-2.5 py-1.5 rounded-lg bg-surface-2 border border-surface-5/30 text-xs text-ink-rich focus:border-amber-400 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] font-bold text-ink-faint uppercase">Custom Agent Instructions</label>
+                            <button
+                              type="button"
+                              onClick={handleBroadSearch}
+                              disabled={agentSearching}
+                              className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
+                              title="Search related artwork and discography without typing custom query"
+                            >
+                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6"/><path d="M11 8v6"/></svg>
+                              <span>Do Broad Search</span>
+                            </button>
+                          </div>
+                          <div className="flex flex-col sm:flex-row gap-2 mt-1">
+                            <textarea 
+                              rows={2}
+                              value={agentPrompt} 
+                              onChange={(e) => setAgentPrompt(e.target.value)}
+                              placeholder="Enter custom search instructions or click 'Broad Search'..."
+                              className="flex-1 px-3 py-1.5 rounded-lg bg-surface-2 border border-surface-5/30 text-xs text-ink-rich focus:border-amber-400 focus:outline-none resize-none custom-scrollbar"
+                            />
+                            <div className="flex sm:flex-col gap-1.5 shrink-0 self-end sm:self-stretch">
+                              <button
+                                type="button"
+                                onClick={handleBroadSearch}
+                                disabled={agentSearching}
+                                className="flex-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-3 hover:bg-surface-4 text-amber-400 border border-amber-400/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                                title="Search related artwork without strict album match"
+                              >
+                                <span>Broad Search</span>
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={agentSearching}
+                                className="flex-1 px-4 py-1.5 rounded-lg text-xs font-bold bg-amber-400 hover:bg-amber-300 text-surface-0 border border-amber-400/40 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                              >
+                                {agentSearching ? (
+                                  <>
+                                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8" strokeWidth="4" className="opacity-75"/></svg>
+                                    <span>Searching...</span>
+                                  </>
+                                ) : (
+                                  <span>Agent Search</span>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          {agentError && (
+                            <div className="mt-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400 flex items-center gap-2">
+                              <svg className="w-4 h-4 shrink-0 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                              <span>{agentError}</span>
+                            </div>
+                          )}
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer / Final Confirmation */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-surface-5/30 px-5 py-3.5 bg-surface-2/60">
+                  <span className="text-[11px] text-ink-muted">
+                    Selected artwork will be embedded into audio tags & folder.
+                  </span>
+                  <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setShowCoverModal(false)}
+                      className="px-3.5 py-2 rounded-lg text-xs font-semibold text-ink-muted hover:text-ink-rich hover:bg-surface-3 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    {isBulk ? (
+                      <button
+                        type="button"
+                        onClick={() => handleConfirmApplyCover(false)}
+                        disabled={coverLoading || agentSearching}
+                        className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-400 hover:bg-amber-300 text-surface-0 shadow-lg shadow-amber-400/20 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        <span>{coverLoading ? 'Embedding...' : `Apply to All ${tracks.length} Selected`}</span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmApplyCover(false)}
+                          disabled={coverLoading || agentSearching}
+                          className="px-3.5 py-2 rounded-lg text-xs font-bold bg-surface-3 hover:bg-surface-4 text-ink-rich border border-surface-5/50 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          {coverLoading ? 'Embedding...' : 'Apply to Track'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmApplyCover(true)}
+                          disabled={coverLoading || agentSearching}
+                          className="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                          title="Apply artwork to this track and immediately sync it to all other tracks in this album"
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <polyline points="1 20 1 14 7 14"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                          </svg>
+                          <span>{coverLoading ? 'Syncing...' : 'Apply & Sync to Entire Album'}</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
+
+      {/* In-app Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        confirmVariant={confirmModal.confirmVariant}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

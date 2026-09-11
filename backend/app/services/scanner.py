@@ -412,6 +412,39 @@ def scan_file(filepath: str) -> dict | None:
         import json
         raw_tags_json = json.dumps(raw_fetched.get("tags", {}))
 
+        # Check for cover art
+        has_cover = False
+        if tags_to_check and hasattr(tags_to_check, "keys"):
+            for k in tags_to_check.keys():
+                k_str = str(k)
+                if k_str.startswith("APIC") or k_str == "covr" or k_str.lower() == "metadata_block_picture":
+                    has_cover = True
+                    break
+        if not has_cover and hasattr(audio, "pictures") and audio.pictures:
+            has_cover = True
+
+        if not has_cover and ext in (".wav", ".flac"):
+            try:
+                from mutagen.id3 import ID3
+                id3_obj = ID3(filepath)
+                for k in id3_obj.keys():
+                    if str(k).startswith("APIC"):
+                        has_cover = True
+                        break
+            except Exception:
+                pass
+
+        # Check directory fallback for existing cover files (folder.jpg, cover.jpg, etc.)
+        if not has_cover:
+            try:
+                parent_dir = Path(filepath).parent
+                for cand in ("cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "albumart.jpg", "front.jpg", "front.png", "Folder.jpg", "Cover.jpg"):
+                    if (parent_dir / cand).is_file():
+                        has_cover = True
+                        break
+            except Exception:
+                pass
+
         return {
             "path": filepath,
             "filename": os.path.basename(filepath),
@@ -424,6 +457,7 @@ def scan_file(filepath: str) -> dict | None:
             "duration": round(duration, 2),
             "bitrate": bitrate,
             "has_lyrics": bool(tags.get("lyrics", "").strip()),
+            "has_cover": has_cover,
             "language": tags.get("language", ""),
             "has_junk": has_junk,
             "format": fmt,
@@ -449,7 +483,7 @@ def fetch_raw_tags(filepath: str) -> dict:
         raw_tags = {}
         if tags_obj and hasattr(tags_obj, "items"):
             for key, val in tags_obj.items():
-                if key.startswith("APIC") or key == "covr":
+                if key.startswith("APIC") or key == "covr" or key == "metadata_block_picture":
                     raw_tags[str(key)] = "__ALBUM_ART__"
                     continue
                 if hasattr(val, 'text'):
@@ -460,7 +494,11 @@ def fetch_raw_tags(filepath: str) -> dict:
                 elif isinstance(val, list):
                     raw_tags[str(key)] = [str(v) for v in val]
                 else:
-                    raw_tags[str(key)] = str(val).replace('\x00', '; ')
+                    raw_tags[str(key)] = str(val)
+
+        # Handle FLAC pictures
+        if hasattr(audio, "pictures") and audio.pictures:
+            raw_tags["PICTURE"] = "__ALBUM_ART__"
                     
         return {
             "tags": raw_tags,

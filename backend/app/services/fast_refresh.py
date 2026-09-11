@@ -58,8 +58,8 @@ async def start_fast_refresh(job_id: str, progress_dict: dict):
                 if data:
                     print(f"[fast_refresh] Track {track_id} junk: {data['has_junk']} | {path}")
                     await db.execute(
-                        "UPDATE tracks SET has_junk = ? WHERE id = ?",
-                        (1 if data["has_junk"] else 0, track_id)
+                        "UPDATE tracks SET has_junk = ?, has_cover = ? WHERE id = ?",
+                        (1 if data["has_junk"] else 0, 1 if data.get("has_cover") else 0, track_id)
                     )
             except Exception as e:
                 print(f"[fast_refresh] Error on {path}: {e}")

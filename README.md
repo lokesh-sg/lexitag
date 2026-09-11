@@ -1,6 +1,6 @@
 # LexiTag
 
-**Version:** 0.1.7 | **Language:** Python 3.12 / React 18 | **Database:** SQLite
+**Version:** 0.1.8 | **Language:** Python 3.12 / React 18 | **Database:** SQLite
 
 LexiTag is a self-hosted music library metadata manager. It scans your audio files, cleans junk metadata, enriches tags using an AI model, fetches lyrics, and provides a sleek, modern web-based UI for browsing and editing your entire library. Everything runs locally — no cloud sync required.
 
@@ -305,6 +305,21 @@ LexiTag features an automated background library scanner that keeps your music d
 ---
 
 ## Release Notes
+
+### v0.1.8 (2026-09-11)
+- **Album Art Gallery**: New full-page Album Art Gallery with group-by-album and flat-track views, multi-select checkboxes, bulk Apply / Remove operations, and a per-album or per-track override workflow.
+- **Artwork Research Agent**: AI-powered cover art search using Gemini Google Search Grounding across Apple Music, Spotify, Deezer, Discogs, Wikipedia, MusicBrainz, and Cover Art Archive — with exact album/year matching and source-ranked scoring.
+- **One-Click Broad Search**: Added a dedicated "Broad Search" button to search artist and composer discographies and related artwork across sources without requiring manual text prompts.
+- **Media Server Artwork Synchronization (Navidrome & Jellyfin)**: Cover art embedding now automatically writes and overwrites folder-level image files (`cover.jpg`, `cover.png`, `folder.jpg`, `folder.png`) alongside embedded audio tags, ensuring external media servers immediately display newly applied artwork without caching conflicts.
+- **Apple Music / iTunes API Integration Hardening**: Resolved `ContentTypeError` when parsing Apple iTunes Search API responses by handling `text/javascript` content types, unlocking reliable 1200x1200 master artwork retrieval.
+- **Hallucinated Image URL Rejection**: Hardened artwork validation to strictly filter out dead 404 image URLs from AI search grounding, ensuring only verified, accessible image assets are presented and applied.
+- **Reactive Image Preview Fallback**: Replaced imperative DOM error injection with reactive state fallbacks, preventing distorted or crooked previews for CORS-restricted source URLs.
+- **Bounded LRU Image Cache**: Client-side LRU cache with configurable maximum size prevents browser memory bloat while keeping recently viewed artwork instantly available without server round-trips.
+- **Instant Hover Track Previews & 1-Click Morphing Sync**: Hovering over numbered track pills on a group card displays the track's artwork in the card preview, with a direct "Sync to Album" button on the image overlay and a morphing sync icon right on the hovered track pill for instant 1-click artwork synchronization without having to expand the tracks drawer.
+- **SSRF Protection in `download_image`**: Added strict `http://`/`https://` URL scheme validation before fetching any AI-supplied image URL, preventing local file inclusion or protocol-smuggling attacks.
+- **Production Log Hardening**: Downgraded `async_upnp_client` logger from `DEBUG` to `INFO` so verbose UPnP wire traces are suppressed in production container logs.
+- **UI Alignment Polish**: Standardised group card action buttons (Edit / Sync / AI Pull) to matching outline icons (`strokeWidth="2.5"`, `w-3.5 h-3.5`), unified height (`h-7.5`), and `inline-flex items-center justify-center` layout for pixel-perfect alignment.
+- **User-Agent Version Sync**: Bumped all outgoing HTTP `User-Agent` headers across `cover_art_service.py`, `upnp.py`, and `main.py` to reflect `LexiTag/0.1.8`.
 
 ### v0.1.7 (2026-09-01)
 - **Automatic Multi-Screen & Mobile Optimization**: Complete responsive redesign of navigation header, search bar, filter chips with horizontal scrolling, metadata edit modals, bottom player bar, and history views to seamlessly adapt across mobile phones, tablets, laptops, and ultra-wide displays.
