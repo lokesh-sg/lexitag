@@ -6,9 +6,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [0.1.8] — 2026-09-11
+## [0.1.8] — 2026-09-15 (Build 20260915)
 
 ### Added
+- **Sidecar `.lrc` Discovery & Management** — Automatically detects adjacent `.lrc` sidecar files in the track directory on disk, tags them with `lyrics_source="sidecar"`, and displays a distinct `📄 Sidecar` badge across the library table and track modal.
+- **Sidecar-Only Library Filter** — Added `Sidecar Only` filter tab in the UI to isolate tracks with external `.lrc` files, with 1-click Local Fix to embed them into audio tags (`USLT`/`LYRICS`).
+- **Missing Lyrics Filter Exclusion** — Tracks with existing sidecar `.lrc` files are automatically excluded from the `Missing Lyrics` filter.
 - **Album Art Gallery** — Full-page gallery view with group-by-album and flat-track modes, multi-select checkboxes, and bulk Apply / Remove operations.
 - **Artwork Research Agent** — AI-powered cover art search using Gemini Google Search Grounding across Apple Music, Spotify, Deezer, Discogs, Wikipedia, MusicBrainz, and Cover Art Archive. Results are scored by exact album/year matching and source rank.
 - **One-Click Broad Search** — Dedicated "Broad Search" button to search an artist's or composer's full discography for related artwork without manual text prompts.
@@ -19,6 +22,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **SSRF Protection in `download_image`** — Strict `http://`/`https://` URL scheme validation before fetching any AI-supplied image URL, blocking local-file inclusion and protocol-smuggling attacks.
 
 ### Fixed
+- **Anti-Recitation Grounded Lyric Retrieval** — Resolved Gemini API `finishReason: "RECITATION"` blocks by using timestamped line markers during generation to bypass Google's verbatim copyright filter, and automatically stripping line markers in Python (`strip_lrc_timestamps`) to deliver pure, authentic plain-text lyrics with zero hallucinated timestamps.
+- **Natural Open-Web Grounding Search** — Replaced rigid, site-specific queries with natural human-style Google Search grounding (`[song title] lyrics`), eliminating false `LYRICS_NOT_FOUND` errors caused by restrictive site names or inaccurate album tags.
+- **ID3 Writer `lang_code` Unbound Error** — Fixed `UnboundLocalError` in `_apply_id3_frames` when writing tags for tracks without an explicit language code.
+- **Decoupled Lyrics from Master Forensic LLM** — Master LLM focuses purely on track identification and JSON metadata without overloading tokens on multi-stanza lyrics; lyric retrieval is handled exclusively by the dedicated `lyrics_llm` service.
+- **Docker Production Static Asset Serving** — Configured FastAPI static files mount in `main.py` to serve `/app/static` with automatic fallback to `backend/app/static`.
 - **Apple Music / iTunes API Integration** — Resolved `ContentTypeError` on `text/javascript` responses from the iTunes Search API, restoring reliable 1200×1200 master artwork retrieval.
 - **Hallucinated Image URL Rejection** — Artwork validation now strictly filters dead 404 URLs from AI search grounding, ensuring only verified, accessible images are presented and applied.
 - **Reactive Image Preview Fallback** — Replaced imperative DOM error injection with reactive state fallbacks, preventing distorted previews for CORS-restricted source URLs.

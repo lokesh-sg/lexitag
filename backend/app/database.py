@@ -125,6 +125,7 @@ async def _run_migrations(db: aiosqlite.Connection):
     await _safe_add_column(db, "tracks", "bitrate", "INTEGER DEFAULT 0")
     await _safe_add_column(db, "tracks", "is_missing", "INTEGER DEFAULT 0")
     await _safe_add_column(db, "tracks", "has_cover", "INTEGER DEFAULT 0")
+    await _safe_add_column(db, "tracks", "lyrics_source", "TEXT DEFAULT ''")
 
     await _safe_add_column(db, "tag_history", "duration_seconds", "REAL DEFAULT 0")
 

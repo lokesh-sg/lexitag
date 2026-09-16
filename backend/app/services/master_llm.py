@@ -9,7 +9,7 @@ SYSTEM_PROMPT = (
     "You are a forensic music metadata restoration expert and retrieval assistant.\n\n"
     "CRITICAL OUTPUT RULE:\n"
     "- Research and identify the track thoroughly using Google Search.\n"
-    "- Once identified, you MUST provide the final metadata and lyrics in the following JSON format.\n"
+    "- Once identified, you MUST provide the final metadata, language, and suggested filename in the following JSON format.\n"
     "- Ensure the JSON is the primary delivery of your findings.\n"
     "- Do not use multiple JSON blocks; only one complete object.\n\n"
     "TASK:\n"
@@ -20,25 +20,20 @@ SYSTEM_PROMPT = (
     "   - NEGATIVES: NEVER include 'Original Motion Picture Soundtrack' or 'Original Background Score' in the 'album' or 'title' fields. 'Album' MUST ONLY be the pure Movie Name (e.g., 'Kidaari', not 'Kidaari (Original Background Score)').\n"
     "   - 'Album' MUST ONLY be the pure Movie Name.\n"
     "   - Ensure the language of the title matches the movie's region.\n"
-    "2. CLEAN: Strip URLs, junk, and technical technical suffixes from all metadata.\n"
-    "3. LYRICS: Retrieve the COMPLETE, ACCURATE lyrics for this song. Plain text ONLY. No timestamps.\n"
-    "4. LANGUAGE: Identify the full name of the language (e.g., 'Tamil', 'Hindi', 'English').\n"
-    "5. FILENAME: Suggest a 'suggested_filename' in 'Artist - Title' format.\n\n"
+    "2. CLEAN: Strip URLs, junk, and technical suffixes from all metadata.\n"
+    "3. LANGUAGE: Identify the full name of the language (e.g., 'Tamil', 'Hindi', 'English').\n"
+    "4. FILENAME: Suggest a 'suggested_filename' in 'Artist - Title' format.\n\n"
     "CRITICAL METADATA RULES:\n"
     "- If you see any 'Unknown artist', 'Unknown album', or 'Unknown genre' strings in the input, IGNORE THEM. This means they are placeholders and you MUST RESEARCH the TRUE values from scratch using Google Search.\n"
     "- Identify the COMPLETE artist list (multiple singers if applicable).\n"
-    "- Identify the COMPSER / Music Director (e.g. 'Ilaiyaraaja', 'A.R. Rahman').\n"
+    "- Identify the COMPOSER / Music Director (e.g. 'Ilaiyaraaja', 'A.R. Rahman').\n"
     "- If you find multiple versions of a track, prioritize the Original Motion Picture or Original Studio version.\n"
-    "- If you cannot find the lyrics, set 'lyrics' to 'LYRICS_NOT_FOUND'.\n"
-    "- If the track is an INSTRUMENTAL (common in Jazz or Scores), set 'lyrics' to 'INSTRUMENTAL'.\n"
-    "- LRYICS REPETITION: Do not repeat blocks of lyrics in a loop. If the song is very long, provide the first several verses and the chorus.\n"
     "- AVOID LISTS: Do not provide a list of all tracks in an album. Focus EXCLUSIVELY on the ONE track provided in the raw_tags/filename.\n\n"
     "OUTPUT FORMAT:\n"
     "{\n"
     "  \"metadata\": {\"title\": \"...\", \"artist\": \"...\", \"album\": \"...\", \"composer\": \"...\", \"year\": \"...\", \"genre\": \"...\"},\n"
     "  \"language\": \"...\",\n"
-    "  \"suggested_filename\": \"Artist - Title\",\n"
-    "  \"lyrics\": \"...\"\n"
+    "  \"suggested_filename\": \"Artist - Title\"\n"
     "}"
 )
 
@@ -47,7 +42,7 @@ _cache = {}
 
 async def process_song_full(tags: dict, filename: str = "", parent_folder: str = "", force_lyrics: bool = False, on_retry: callable = None) -> dict:
     """
-    Perform a single, consolidated LLM call for identification, sanitization, language, and lyrics.
+    Perform a single, consolidated LLM call for identification, sanitization, and language.
     """
     # Create a cache key
     cache_key = f"{filename}|{tags.get('artist')}|{tags.get('title')}"
@@ -59,11 +54,10 @@ async def process_song_full(tags: dict, filename: str = "", parent_folder: str =
         "raw_tags": tags,
         "filename": filename,
         "parent_folder": parent_folder,
-        "request_lyrics": force_lyrics,
         "search_context": tags.get("search_context", "") # Pass through search context if available
     }
     
-    user_msg = f"Search Google and identify this song. Clean the metadata and fetch lyrics if possible:\n{json.dumps(input_data)}"
+    user_msg = f"Search Google and identify this song. Clean the metadata:\n{json.dumps(input_data)}"
     
     # Use Google Search Grounding for high-fidelity retrieval
     tools = [{"google_search": {}}]
@@ -80,7 +74,7 @@ async def process_song_full(tags: dict, filename: str = "", parent_folder: str =
                 system_prompt=SYSTEM_PROMPT,
                 user_message=user_msg,
                 temperature=0.1 if attempt > 0 else 0.0,
-                max_tokens=2048, 
+                max_tokens=4096, 
                 on_retry=on_retry,
                 tools=tools
             )
@@ -102,7 +96,7 @@ async def process_song_full(tags: dict, filename: str = "", parent_folder: str =
                     json_str = json_str.replace("```json", "").replace("```", "")
             else:
                 json_str = text
-                print(f"[master_llm] No JSON braces found. Falling back to plain text/lyrics parsing for '{filename}'")
+                print(f"[master_llm] No JSON braces found for '{filename}'")
 
             try:
                 if start != -1 and end != -1:
@@ -117,10 +111,7 @@ async def process_song_full(tags: dict, filename: str = "", parent_folder: str =
                          if match: meta[key] = match.group(1).strip().rstrip('",. \t')
                     
                     lang_match = re.search(r'["\']?language["\']?\s*[:=]\s*["\']?([^"\',;\n]+)["\']?', json_str, re.I)
-                    lyr_match = re.search(r'["\']?lyrics["\']?\s*[:=]\s*(.*)', json_str, re.S | re.I)
-                    
-                    # If LLM returned text (likely lyrics) without a JSON block, construct a valid result using existing tags & text
-                    lyrics_text = text if start == -1 else (lyr_match.group(1).split("}", 1)[0].replace('\\n', '\n').strip(' \n\t"\'') if lyr_match else "")
+                    fn_match = re.search(r'["\']?suggested_filename["\']?\s*[:=]\s*["\']?([^"\',;\n]+)["\']?', json_str, re.I)
                     
                     result = {
                         "metadata": {
@@ -132,7 +123,7 @@ async def process_song_full(tags: dict, filename: str = "", parent_folder: str =
                             "composer": meta.get("composer") or tags.get("composer", ""),
                         },
                         "language": lang_match.group(1).strip().rstrip('",. \t') if lang_match else (tags.get("language") or "Undetermined"),
-                        "lyrics": lyrics_text
+                        "suggested_filename": fn_match.group(1).strip().rstrip('",. \t') if fn_match else None
                     }
                 except Exception as e:
                     raise RuntimeError(f"LLM parsing failed: {e}")
@@ -199,6 +190,5 @@ async def process_song_full(tags: dict, filename: str = "", parent_folder: str =
     return {
         "metadata": {},
         "language": "Undetermined",
-        "suggested_filename": None,
-        "lyrics": ""
+        "suggested_filename": None
     }

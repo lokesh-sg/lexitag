@@ -217,6 +217,7 @@ def _get_lang_code(lang: str) -> str:
 
 def _apply_id3_frames(id3: ID3, tags: dict, lyrics: str, language: str, raw_tags: dict, filepath: str):
     """Core logic to apply ID3 frames to an ID3 object."""
+    lang_code = _get_lang_code(language) if language else "eng"
     # 0. Universal Purge of Hidden Technical / Junk Tracking Frames
     junk_patterns = ["musicbrainz", "acoustid", "fingerprint", "barcode", "ufid", "priv", "mcdi", "tlen", "tsrc", "tsse", "tenc"]
     keys_to_delete = []
@@ -273,7 +274,6 @@ def _apply_id3_frames(id3: ID3, tags: dict, lyrics: str, language: str, raw_tags
     
     if language is not None:
         if language:
-            lang_code = _get_lang_code(language)
             id3["TLAN"] = TLAN(encoding=3, text=[lang_code])
             if len(language) > 3:
                 id3.add(TXXX(encoding=3, desc="Language", text=[language]))

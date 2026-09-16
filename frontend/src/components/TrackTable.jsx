@@ -313,8 +313,12 @@ export default function TrackTable({
                             Junk
                         </span>
                         ) : null}
-                        {track.has_lyrics ? (
-                        <span className="px-1.5 py-0.5 rounded bg-fn-success/20 text-[#79cb8d] text-[9px] font-bold uppercase tracking-wider border border-fn-success/35 leading-none shrink-0">
+                        {track.lyrics_source === 'sidecar' ? (
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[9px] font-bold uppercase tracking-wider border border-cyan-500/35 leading-none shrink-0" title="Sidecar .lrc file in folder">
+                            📄 Sidecar
+                        </span>
+                        ) : track.has_lyrics ? (
+                        <span className="px-1.5 py-0.5 rounded bg-fn-success/20 text-[#79cb8d] text-[9px] font-bold uppercase tracking-wider border border-fn-success/35 leading-none shrink-0" title="Embedded in audio metadata">
                             LRC
                         </span>
                         ) : (

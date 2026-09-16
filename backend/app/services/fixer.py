@@ -167,7 +167,6 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
             
             language = master_result.get("language", "Undetermined")
             suggested_filename = master_result.get("suggested_filename")
-            llm_lyrics_found = master_result.get("lyrics", "")
 
             INTERNAL_KEYS = {
                 "current_filename", "parent_folder", "acoustid_id", "acoustid_fingerprint",
@@ -202,32 +201,60 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
                 elif artist:
                     suggested_filename = f"Unknown - {_flatten_tag(artist)}"
             
-            llm_lyrics_found = ""
             language = row["language"] or ""
 
         # ── Step 4: LYRICS ──
         if not local_only:
             await notify("lyrics", "running", "Fetching lyrics...")
-            lyrics = await fetch_lyrics(
-                artist=cleaned_tags.get("artist", ""),
-                title=cleaned_tags.get("title", ""),
-                album=cleaned_tags.get("album", ""),
-                duration=file_data.get("duration", 0),
-            )
-                
-            if not lyrics or not lyrics.strip():
-                if llm_lyrics_found and "LYRICS_NOT_FOUND" not in llm_lyrics_found:
-                    lyrics = llm_lyrics_found
-                else:
+
+            # 1. Check for local sidecar .lrc first!
+            from backend.app.services.scanner import find_sidecar_lrc
+            sidecar = find_sidecar_lrc(track_path)
+            if sidecar:
+                lyrics = sidecar
+                await notify("lyrics", "done", "Loaded from local sidecar .lrc")
+            else:
+                # In lyrics_only mode, cleaned_tags is the pre-cleaned (but still potentially dirty)
+                # version. Strip common junk patterns from album/title before sending to LRCLIB
+                # so the lookup has the best chance of matching.
+                import re
+                _OST_JUNK = re.compile(
+                    r"\s*(\(|\-)\s*(Original Motion Picture Soundtrack|Original Soundtrack|"
+                    r"Original Background Score|Original Score|OST|BGM|Video Songs|"
+                    r"Vol\.?\s*\d+|Volume\s*\d+|Soundtrack)[^)]*\)?\s*",
+                    re.IGNORECASE
+                )
+                lrclib_title  = _OST_JUNK.sub("", cleaned_tags.get("title", "")).strip()
+                lrclib_album  = _OST_JUNK.sub("", cleaned_tags.get("album", "")).strip()
+                lrclib_artist = cleaned_tags.get("artist", "")
+
+                lyrics = await fetch_lyrics(
+                    artist=lrclib_artist,
+                    title=lrclib_title or cleaned_tags.get("title", ""),
+                    album=lrclib_album,
+                    duration=file_data.get("duration", 0),
+                )
+                    
+                _SENTINEL_WORDS = {"LYRICS_NOT_FOUND", "INSTRUMENTAL"}
+                if not lyrics or not lyrics.strip():
+                    # Always use dedicated grounded fetch_lyrics_llm to ensure full, complete multi-verse lyrics
                     lyrics = await fetch_lyrics_llm(
-                        artist=cleaned_tags.get("artist", ""),
-                        title=cleaned_tags.get("title", ""),
-                        album=cleaned_tags.get("album", ""),
+                        artist=cleaned_tags.get("artist", "") or lrclib_artist,
+                        title=lrclib_title or cleaned_tags.get("title", ""),
+                        album=lrclib_album or cleaned_tags.get("album", ""),
+                        language=language,
                     )
-            await notify("lyrics", "done")
+                await notify("lyrics", "done")
         else:
-            await notify("lyrics", "done", "Skipped (Local only)")
-            lyrics = original_tags.get("lyrics", "")
+            # In local_only mode, check if sidecar .lrc exists
+            from backend.app.services.scanner import find_sidecar_lrc
+            sidecar = find_sidecar_lrc(track_path)
+            if sidecar:
+                lyrics = sidecar
+                await notify("lyrics", "done", "Imported from local sidecar .lrc")
+            else:
+                await notify("lyrics", "done", "Skipped (Local only)")
+                lyrics = original_tags.get("lyrics", "")
 
         # ── Step 5: LANGUAGE ──
         # ── Step 6: WRITE ──
@@ -268,6 +295,14 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
                     
                     if str(actual_new_path).lower() != track_path.lower():
                         shutil.move(track_path, str(actual_new_path))
+                        # Also move sidecar .lrc if present
+                        old_lrc = Path(track_path).with_suffix(".lrc")
+                        if old_lrc.is_file():
+                            new_lrc = Path(actual_new_path).with_suffix(".lrc")
+                            try:
+                                shutil.move(str(old_lrc), str(new_lrc))
+                            except Exception:
+                                pass
                         final_path = str(actual_new_path)
                         await db.execute("UPDATE tracks SET path = ?, filename = ? WHERE id = ?", (final_path, Path(final_path).name, track_id))
                         await db.commit()
@@ -279,7 +314,7 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
         tags_to_write = {k: v for k, v in cleaned_tags.items() if k not in IGNORE_KEYS}
 
         # ONLY Write to file if it was actually fetched or we are applying local rules. Lyrics-only or local skip is respected.
-        if (llm_lyrics_found or not lyrics_only) or local_only:
+        if (lyrics or not lyrics_only) or local_only:
             success = write_tags(final_path, tags_to_write, lyrics, language, raw_tags=raw_tags_to_purge)
             if not success:
                 await notify("write", "error", "File system error.")
@@ -310,7 +345,7 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
             "genre": final_summary.get("genre", ""),
             "year": final_summary.get("year", ""),
             "comment": final_summary.get("comment", ""),
-            "lyrics": lyrics[:200] + "..." if len(lyrics) > 200 else lyrics,
+            "lyrics": lyrics,
             "language": language,
             "composer": final_summary.get("composer", ""),
         }
@@ -330,10 +365,13 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
         final_year = final_summary.get("year") or cleaned_tags.get("year") or original_tags.get("year") or ""
         final_composer = final_summary.get("composer") or cleaned_tags.get("composer") or original_tags.get("composer") or ""
 
+        has_lyr_val = 1 if (lyrics and lyrics.strip()) or final_summary.get("has_lyrics") else 0
+        lyr_src_val = "embedded" if has_lyr_val else ""
+
         await db.execute(
             f"""UPDATE tracks SET
                 title = ?, artist = ?, album = ?, genre = ?, year = ?, composer = ?,
-                has_lyrics = ?, lyrics = ?, language = ?, has_junk = 0, last_scanned = ?,
+                has_lyrics = ?, lyrics_source = ?, lyrics = ?, language = ?, has_junk = 0, last_scanned = ?,
                 path = ?, filename = ?, raw_tags_json = ?,
                 {count_field} = {count_field} + 1, last_fix_type = ?,
                 last_fixed_at = ?, last_ai_fix_duration = ?
@@ -345,7 +383,8 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
                 final_genre,
                 final_year,
                 final_composer,
-                1 if (lyrics and lyrics.strip()) or final_summary.get("has_lyrics") else 0,
+                has_lyr_val,
+                lyr_src_val,
                 "", # Stop saving lyrics to DB
                 language,
                 time.strftime("%Y-%m-%d %H:%M:%S"),

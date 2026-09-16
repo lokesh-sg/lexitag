@@ -141,13 +141,14 @@ async def scan_library():
                     await db.execute(
                         """UPDATE tracks SET
                             filename=?, title=?, artist=?, album=?, genre=?, year=?, composer=?, comment=?,
-                            duration=?, bitrate=?, has_lyrics=?, has_cover=?, language=?, has_junk=?, format=?, lyrics=?, last_scanned=?, is_missing=0, raw_tags_json=?
+                            duration=?, bitrate=?, has_lyrics=?, lyrics_source=?, has_cover=?, language=?, has_junk=?, format=?, lyrics=?, last_scanned=?, is_missing=0, raw_tags_json=?
                            WHERE path=?""",
                         (
                             track["filename"], track["title"], track["artist"],
                             track["album"], track["genre"], track["year"], track["composer"],
                             track.get("comment", ""),
                             track["duration"], track.get("bitrate", 0), 1 if track["has_lyrics"] else 0,
+                            track.get("lyrics_source", "embedded" if track["has_lyrics"] else ""),
                             1 if track.get("has_cover") else 0,
                             track.get("language", ""),
                             1 if track["has_junk"] else 0, track["format"],
@@ -158,13 +159,14 @@ async def scan_library():
                     await db.execute(
                         """INSERT INTO tracks
                             (path, filename, title, artist, album, genre, year, composer, comment,
-                             duration, bitrate, has_lyrics, has_cover, language, has_junk, format, lyrics, last_scanned, is_missing, raw_tags_json)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
+                             duration, bitrate, has_lyrics, lyrics_source, has_cover, language, has_junk, format, lyrics, last_scanned, is_missing, raw_tags_json)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
                         (
                             track["path"], track["filename"], track["title"],
                             track["artist"], track["album"], track["genre"],
                             track["year"], track["composer"], track.get("comment", ""),
                             track["duration"], track.get("bitrate", 0), 1 if track["has_lyrics"] else 0,
+                            track.get("lyrics_source", "embedded" if track["has_lyrics"] else ""),
                             1 if track.get("has_cover") else 0,
                             track.get("language", ""),
                             1 if track["has_junk"] else 0, track["format"], "", track["last_scanned"],
@@ -472,7 +474,9 @@ async def list_tracks(
             params.extend([s, s, s, s, s])
 
     if filter == "missing_lyrics":
-        where_clauses.append("has_lyrics = 0")
+        where_clauses.append("has_lyrics = 0 AND (lyrics_source != 'sidecar' OR lyrics_source IS NULL OR lyrics_source = '')")
+    elif filter == "sidecar_lyrics":
+        where_clauses.append("lyrics_source = 'sidecar'")
     elif filter == "has_junk":
         where_clauses.append("has_junk = 1")
     elif filter == "missing_language":
@@ -528,6 +532,7 @@ async def list_tracks(
             duration=row["duration"] or 0.0,
             bitrate=row["bitrate"] if "bitrate" in row.keys() else 0,
             has_lyrics=bool(row["has_lyrics"]),
+            lyrics_source=row["lyrics_source"] if "lyrics_source" in row.keys() and row["lyrics_source"] else ("embedded" if row["has_lyrics"] else ""),
             has_cover=bool(row["has_cover"]),
             language=row["language"] or "",
             has_junk=bool(row["has_junk"]),
@@ -568,6 +573,7 @@ async def get_track(track_id: int):
         duration=row["duration"] or 0.0,
         bitrate=row["bitrate"] if "bitrate" in row.keys() else 0,
         has_lyrics=bool(row["has_lyrics"]),
+        lyrics_source=row["lyrics_source"] if "lyrics_source" in row.keys() and row["lyrics_source"] else ("embedded" if row["has_lyrics"] else ""),
         has_cover=bool(row["has_cover"]),
         language=row["language"] or "",
         has_junk=bool(row["has_junk"]),
@@ -988,15 +994,24 @@ async def get_track_lyrics(track_id: int):
         raise HTTPException(status_code=404, detail="Track not found")
         
     lyrics = ""
+    lyrics_source = "none"
     try:
         data = scan_file(row["path"])
-        if data:
-            lyrics = data.get("lyrics", "")
+        if data and data.get("lyrics"):
+            lyrics = data["lyrics"]
+            lyrics_source = data.get("lyrics_source", "embedded")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Audio file not found on disk. Is the volume mounted?")
     except Exception:
         pass
         
+    if not lyrics or not lyrics.strip():
+        from backend.app.services.scanner import find_sidecar_lrc
+        sidecar = find_sidecar_lrc(row["path"])
+        if sidecar:
+            lyrics = sidecar
+            lyrics_source = "sidecar"
+
     if not lyrics or not lyrics.strip():
         h_cursor = await db.execute(
             "SELECT changed_tags, original_tags FROM tag_history WHERE (track_id = ? OR track_path = ?) ORDER BY id DESC",
@@ -1012,19 +1027,22 @@ async def get_track_lyrics(track_id: int):
                     if val == "" or val is None:
                         # User explicitly cleared lyrics in latest edit
                         lyrics = ""
+                        lyrics_source = "none"
                         break
                     elif val and val.strip() and "LYRICS_NOT_FOUND" not in val:
                         lyrics = val.strip()
+                        lyrics_source = "history"
                         break
                 elif "lyrics" in ot:
                     val = ot["lyrics"]
                     if val and val.strip() and "LYRICS_NOT_FOUND" not in val:
                         lyrics = val.strip()
+                        lyrics_source = "history"
                         break
             except Exception:
                 pass
 
-    return {"lyrics": lyrics}
+    return {"lyrics": lyrics, "source": lyrics_source}
 
 
 @router.get("/{track_id}/cover")

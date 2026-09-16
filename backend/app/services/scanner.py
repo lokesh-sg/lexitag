@@ -28,6 +28,39 @@ def _check_junk(text: str) -> bool:
     return False
 
 
+def find_sidecar_lrc(filepath: str) -> str:
+    """Check if a sidecar .lrc file exists next to the audio file and return its content."""
+    try:
+        p = Path(filepath)
+        # 1. Exact stem match: SongName.lrc
+        exact_lrc = p.with_suffix(".lrc")
+        if exact_lrc.is_file():
+            for enc in ("utf-8", "utf-8-sig", "latin-1", "utf-16"):
+                try:
+                    content = exact_lrc.read_text(encoding=enc).strip()
+                    if content:
+                        return content
+                except (UnicodeDecodeError, UnicodeError):
+                    continue
+
+        # 2. Case-insensitive stem match in parent folder
+        stem_lower = p.stem.lower()
+        if p.parent.is_dir():
+            for sibling in p.parent.iterdir():
+                if sibling.is_file() and sibling.suffix.lower() == ".lrc":
+                    if sibling.stem.lower() == stem_lower:
+                        for enc in ("utf-8", "utf-8-sig", "latin-1", "utf-16"):
+                            try:
+                                content = sibling.read_text(encoding=enc).strip()
+                                if content:
+                                    return content
+                            except (UnicodeDecodeError, UnicodeError):
+                                continue
+    except Exception as e:
+        print(f"[scanner] Error checking sidecar LRC for {filepath}: {e}")
+    return ""
+
+
 def _get_id3_tags(audio) -> dict:
     """Extract tags from an ID3-based file (MP3/WAV with ID3)."""
     tags = {
@@ -344,6 +377,16 @@ def scan_file(filepath: str) -> dict | None:
         info = getattr(audio, 'info', None)
         duration = info.length if info and hasattr(info, "length") else 0.0
 
+        # Check for sidecar .lrc file if no embedded lyrics found
+        lyrics_source = ""
+        if tags.get("lyrics") and tags["lyrics"].strip():
+            lyrics_source = "embedded"
+        else:
+            sidecar = find_sidecar_lrc(filepath)
+            if sidecar:
+                tags["lyrics"] = sidecar
+                lyrics_source = "sidecar"
+
         # Check for junk - Deep Scan (check every available tag)
         has_junk = False
         tags_to_check = getattr(audio, 'tags', audio)
@@ -457,6 +500,7 @@ def scan_file(filepath: str) -> dict | None:
             "duration": round(duration, 2),
             "bitrate": bitrate,
             "has_lyrics": bool(tags.get("lyrics", "").strip()),
+            "lyrics_source": lyrics_source,
             "has_cover": has_cover,
             "language": tags.get("language", ""),
             "has_junk": has_junk,

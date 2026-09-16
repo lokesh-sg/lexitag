@@ -127,8 +127,9 @@ async def health_check():
     }
 
 # Serve frontend static files with SPA fallback
-# In production, the Dockerfile copies built frontend to /app/static
-prod_static = Path("/app/static")
+prod_static = Path(__file__).resolve().parent / "static"
+if not (prod_static / "index.html").exists():
+    prod_static = Path("/app/static")
 static_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 

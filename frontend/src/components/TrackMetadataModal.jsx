@@ -30,6 +30,7 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated, initial
     newPath: '',
   });
   const [saving, setSaving] = useState(false);
+  const [lyricsSource, setLyricsSource] = useState('');
   const [error, setError] = useState(null);
   const [showAddTag, setShowAddTag] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -131,6 +132,7 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated, initial
             newPath: trackRecord.path || '',
           });
           
+          setLyricsSource(lyricsRes.source || trackRecord.lyrics_source || (lyricsRes.lyrics ? 'embedded' : ''));
           setHistory(historyRes.entries || []);
       }
     } catch (err) {
@@ -698,7 +700,26 @@ export default function TrackMetadataModal({ tracks, onClose, onUpdated, initial
                   )}
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-ink-normal uppercase tracking-wider">Lyrics</label>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-bold text-ink-normal uppercase tracking-wider">Lyrics</label>
+                        {!isBulk && lyricsSource === 'sidecar' && (
+                          <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 text-[9px] font-bold uppercase tracking-wider border border-cyan-500/35 leading-none flex items-center gap-1" title="Loaded from sidecar .lrc file in folder">
+                            📄 Sidecar .LRC
+                          </span>
+                        )}
+                        {!isBulk && lyricsSource === 'embedded' && (
+                          <span className="px-1.5 py-0.5 rounded bg-fn-success/20 text-[#79cb8d] text-[9px] font-bold uppercase tracking-wider border border-fn-success/35 leading-none flex items-center gap-1" title="Embedded in audio metadata container">
+                            🎵 Embedded
+                          </span>
+                        )}
+                        {!isBulk && !formData.lyrics && (
+                          <span className="px-1.5 py-0.5 rounded bg-surface-3 text-ink-muted text-[9px] font-bold uppercase tracking-wider border border-surface-5/50 leading-none">
+                            None
+                          </span>
+                        )}
+                      </div>
+                    </div>
                     <textarea
                       name="lyrics"
                       value={formData.lyrics}

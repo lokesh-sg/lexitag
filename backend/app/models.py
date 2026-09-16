@@ -18,6 +18,7 @@ class TrackBase(BaseModel):
     duration: float = 0.0
     bitrate: int = 0
     has_lyrics: bool = False
+    lyrics_source: str = ""
     has_cover: bool = False
     language: str = ""
     has_junk: bool = False

@@ -212,6 +212,8 @@ async def _call_gemini_native(provider: dict, system_prompt: str, user_message: 
                     raise RuntimeError("Gemini cut off (MAX_TOKENS). Try increasing max tokens or switching models.")
                 if reason == 'SAFETY':
                     raise RuntimeError("Gemini response blocked by safety filters.")
+                if reason == 'RECITATION':
+                    raise RuntimeError("RECITATION: Gemini refused to reproduce lyrics (copyright protection). Prompt strategy needs adjustment.")
                 
                 raise RuntimeError(f"Gemini returned empty content (Reason: {reason})")
                 

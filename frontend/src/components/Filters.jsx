@@ -3,6 +3,7 @@ import React from 'react';
 const FILTERS = [
   { key: '', label: 'All', icon: null },
   { key: 'missing_lyrics', label: 'Missing Lyrics' },
+  { key: 'sidecar_lyrics', label: 'Sidecar Only' },
   { key: 'has_junk', label: 'Has Junk' },
   { key: 'missing_language', label: 'Missing Language' },
   { key: 'untouched', label: 'Untouched' },
