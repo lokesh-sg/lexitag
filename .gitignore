@@ -32,7 +32,10 @@ builds/
 backups/
 prod/
 
-# IDE
+# IDE & AI Agent Config
+.agents/
+.cursor/
+.gemini/
 .vscode/
 .idea/
 *.swp
