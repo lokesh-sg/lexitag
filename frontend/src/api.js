@@ -54,7 +54,7 @@ export async function fetchTracks({ page = 1, pageSize = 50, search = '', search
     return data;
 }
 
-export async function fetchTrackGroups({ groupBy = 'album', page = 1, pageSize = 48, search = '', filter = '' } = {}) {
+export async function fetchTrackGroups({ groupBy = 'album', page = 1, pageSize = 48, search = '', filter = '', sortBy = 'alpha' } = {}) {
     const { data } = await api.get('/tracks/groups', {
         params: {
             group_by: groupBy,
@@ -62,6 +62,7 @@ export async function fetchTrackGroups({ groupBy = 'album', page = 1, pageSize =
             page_size: pageSize,
             search,
             filter,
+            sort_by: sortBy,
         },
     });
     return data;
@@ -357,6 +358,32 @@ export async function fetchAutoScanSettings() {
 
 export async function updateAutoScanSettings(config) {
     const { data } = await api.post('/settings/auto-scan', config);
+    return data;
+}
+
+export async function fetchFsWatcherSettings() {
+    const { data } = await api.get('/settings/fs-watcher');
+    return data;
+}
+
+export async function updateFsWatcherSettings(config) {
+    const { data } = await api.post('/settings/fs-watcher', config);
+    return data;
+}
+
+export async function fetchDatabaseStats() {
+    const { data } = await api.get('/settings/database/stats');
+    return data;
+}
+
+export async function cleanupDatabase({ action, pathPrefix = null, includeHistory = true }) {
+    const { data } = await api.post('/settings/database/cleanup', {
+        action,
+        path_prefix: pathPrefix,
+        include_history: includeHistory,
+    }, {
+        timeout: 120000, // Allow up to 2 minutes for VACUUM on large DBs
+    });
     return data;
 }
 

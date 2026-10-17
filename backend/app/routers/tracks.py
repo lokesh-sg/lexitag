@@ -310,9 +310,10 @@ async def list_track_groups(
     page_size: int = Query(48, ge=1, le=500),
     search: str = Query(""),
     filter: str = Query(""),
+    sort_by: str = Query("alpha"),
 ):
     """
-    List track groups (albums, artists, or folders) with true group-level pagination and counts.
+    List track groups (albums, artists, or folders) with true group-level pagination, counts, and sorting.
     """
     db = await get_db()
 
@@ -337,7 +338,7 @@ async def list_track_groups(
     where_sql = "WHERE " + " AND ".join(where_clauses)
 
     query = f"""
-        SELECT id, path, filename, title, artist, album, year, format, has_cover
+        SELECT id, path, filename, title, artist, album, year, format, has_cover, last_scanned
         FROM tracks
         {where_sql}
         ORDER BY album ASC, artist ASC, title ASC
@@ -378,12 +379,18 @@ async def list_track_groups(
                 "track_count": 0,
                 "has_cover_count": 0,
                 "missing_cover_count": 0,
+                "max_id": r["id"],
+                "max_scanned": r["last_scanned"] or "",
                 "tracks": [],
             }
 
         g = grouped_map[key]
         g["tracks"].append(track_dict)
         g["track_count"] += 1
+        if r["id"] > g["max_id"]:
+            g["max_id"] = r["id"]
+        if (r["last_scanned"] or "") > g["max_scanned"]:
+            g["max_scanned"] = r["last_scanned"] or ""
         if r["has_cover"]:
             g["has_cover_count"] += 1
             if not g["representative_track"].get("has_cover"):
@@ -401,6 +408,15 @@ async def list_track_groups(
         total_tracks = sum(g["has_cover_count"] for g in all_groups)
     else:
         total_tracks = sum(g["track_count"] for g in all_groups)
+
+    # Sort groups if requested (or when filter == 'recently_added')
+    effective_sort = "recently_added" if filter == "recently_added" else sort_by
+    if effective_sort == "recently_added":
+        all_groups.sort(key=lambda g: (g.get("max_id", 0), g.get("max_scanned", "")), reverse=True)
+    elif effective_sort == "last_scanned":
+        all_groups.sort(key=lambda g: (g.get("max_scanned", ""), g.get("max_id", 0)), reverse=True)
+    elif effective_sort == "year":
+        all_groups.sort(key=lambda g: (str(g.get("year") or ""), g.get("title", "").lower()), reverse=True)
 
     total_groups = len(all_groups)
 
@@ -423,7 +439,7 @@ async def list_tracks(
     page_size: int = Query(50, ge=1, le=2000),
     search: str = Query("", description="Search term"),
     search_field: str = Query("all", description="Field to search in: all, title, artist, album, filename"),
-    filter: str = Query("", description="Filter: missing_lyrics, has_junk, missing_language"),
+    filter: str = Query("", description="Filter: missing_lyrics, has_junk, missing_language, recently_added"),
     sort_by: str = Query("title", description="Sort field"),
     sort_dir: str = Query("asc", description="Sort direction: asc or desc"),
 ):
@@ -495,9 +511,12 @@ async def list_tracks(
     where = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
     # Sanitize sort field
-    allowed_sorts = {"title", "artist", "album", "genre", "year", "duration",
+    allowed_sorts = {"id", "title", "artist", "album", "genre", "year", "duration",
                      "filename", "format", "last_scanned", "composer", "language",
                      "last_fixed_at", "last_fix_type", "bitrate", "comment", "path", "has_cover"}
+    if filter == "recently_added" and sort_by == "title":
+        sort_by = "id"
+        sort_dir = "desc"
     if sort_by not in allowed_sorts:
         sort_by = "title"
     direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
@@ -511,8 +530,9 @@ async def list_tracks(
 
     # Fetch page
     offset = (page - 1) * page_size
+    order_clause = f"{sort_by} {direction}, id DESC" if sort_by != "id" else f"id {direction}"
     cursor = await db.execute(
-        f"SELECT * FROM tracks {where} ORDER BY {sort_by} {direction} LIMIT ? OFFSET ?",
+        f"SELECT * FROM tracks {where} ORDER BY {order_clause} LIMIT ? OFFSET ?",
         params + [page_size, offset],
     )
     rows = await cursor.fetchall()
@@ -643,11 +663,21 @@ async def update_tracks(update: TrackUpdateModel):
         if update.new_path and update.new_path != current_path:
             validate_path(update.new_path)
             try:
+                try:
+                    from backend.app.services.fs_watcher import suppress_rename
+                    suppress_rename(current_path, update.new_path)
+                except Exception:
+                    pass
                 dest = Path(update.new_path)
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 import shutil
                 shutil.move(current_path, update.new_path)
                 path = update.new_path
+                try:
+                    from backend.app.services.fs_watcher import suppress_rename
+                    suppress_rename(current_path, path)
+                except Exception:
+                    pass
             except Exception as e:
                 print(f"[tracks] Failed to move file from {current_path} to {update.new_path}: {e}")
                 if not Path(update.new_path).exists():

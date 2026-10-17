@@ -96,8 +96,9 @@ export default function AlbumArtGallery() {
   const [pageSize, setPageSize] = useState(48);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [filter, setFilter] = useState('all'); // 'all', 'missing_cover', 'has_cover'
+  const [filter, setFilter] = useState('all'); // 'all', 'recently_added', 'missing_cover', 'has_cover'
   const [groupBy, setGroupBy] = useState('none'); // 'none', 'album', 'artist', 'folder'
+  const [sortBy, setSortBy] = useState('alpha'); // 'alpha', 'recently_added', 'last_scanned', 'year'
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [selectedIds, setSelectedIds] = useState(new Set());
   
@@ -143,7 +144,7 @@ export default function AlbumArtGallery() {
     setRecentlyFixedGroupKeys(new Set());
     setRecentlyFixedTrackIds(new Set());
     setHoveredTrack(null);
-  }, [groupBy, filter, page, debouncedSearch]);
+  }, [groupBy, filter, sortBy, page, debouncedSearch]);
 
   // Debounce search
   useEffect(() => {
@@ -158,14 +159,24 @@ export default function AlbumArtGallery() {
   const loadTracks = useCallback(async () => {
     setLoading(true);
     try {
+      const effectiveSort = filter === 'recently_added' ? 'recently_added' : sortBy;
       if (groupBy === 'none') {
+        const trackSortBy =
+          effectiveSort === 'recently_added'
+            ? 'id'
+            : effectiveSort === 'last_scanned'
+            ? 'last_scanned'
+            : effectiveSort === 'year'
+            ? 'year'
+            : 'title';
+        const trackSortDir = effectiveSort === 'alpha' ? 'asc' : 'desc';
         const data = await fetchTracks({
           page,
           pageSize,
           search: debouncedSearch,
           filter: filter === 'all' ? '' : filter,
-          sortBy: 'title',
-          sortDir: 'asc',
+          sortBy: trackSortBy,
+          sortDir: trackSortDir,
         });
         setTracks(data.tracks || []);
         setTotal(data.total || 0);
@@ -177,6 +188,7 @@ export default function AlbumArtGallery() {
           pageSize,
           search: debouncedSearch,
           filter: filter === 'all' ? '' : filter,
+          sortBy: effectiveSort,
         });
         setServerGroups(data.groups || []);
         setTotalGroups(data.total_groups || 0);
@@ -190,7 +202,7 @@ export default function AlbumArtGallery() {
     } finally {
       setLoading(false);
     }
-  }, [groupBy, page, pageSize, debouncedSearch, filter]);
+  }, [groupBy, page, pageSize, debouncedSearch, filter, sortBy]);
 
   useEffect(() => {
     loadTracks();
@@ -846,21 +858,58 @@ export default function AlbumArtGallery() {
             <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar py-0.5">
               {[
                 { id: 'all', label: 'All Tracks' },
+                { id: 'recently_added', label: 'Recently Added', icon: true },
                 { id: 'missing_cover', label: 'Missing Cover Art' },
                 { id: 'has_cover', label: 'Has Cover Art' },
               ].map(f => (
                 <button
                   key={f.id}
-                  onClick={() => { setFilter(f.id); setPage(1); }}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                  onClick={() => {
+                    setFilter(f.id);
+                    if (f.id === 'recently_added') setSortBy('recently_added');
+                    setPage(1);
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
                     filter === f.id
                       ? 'bg-amber-400 text-surface-0 shadow-sm'
                       : 'bg-surface-2 hover:bg-surface-3 text-ink-normal border border-surface-5/40'
                   }`}
                 >
+                  {f.icon && (
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  )}
                   {f.label}
                 </button>
               ))}
+            </div>
+
+            {/* Sort By Selector */}
+            <div className="flex items-center gap-1 bg-surface-2 border border-surface-5/40 rounded-lg px-2 py-1 text-xs">
+              <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 18V4" />
+              </svg>
+              <span className="text-[10px] font-bold text-ink-muted uppercase hidden sm:inline">Sort:</span>
+              <select
+                value={filter === 'recently_added' ? 'recently_added' : sortBy}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSortBy(val);
+                  if (filter === 'recently_added' && val !== 'recently_added') {
+                    setFilter('all');
+                  }
+                  setPage(1);
+                }}
+                className="bg-transparent text-xs font-bold text-ink-rich focus:outline-none cursor-pointer pr-1"
+                title="Sort gallery items"
+              >
+                <option value="alpha" className="bg-surface-2 text-ink-rich">A → Z</option>
+                <option value="recently_added" className="bg-surface-2 text-ink-rich">Recently Added (Newest)</option>
+                <option value="last_scanned" className="bg-surface-2 text-ink-rich">Recently Scanned</option>
+                <option value="year" className="bg-surface-2 text-ink-rich">Release Year (Newest)</option>
+              </select>
             </div>
 
             {/* Group By Selector */}

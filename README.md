@@ -6,7 +6,7 @@
 
 **Self-hosted AI-powered music metadata manager**
 
-[![Version](https://img.shields.io/badge/version-0.1.8-f59e0b?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.9-f59e0b?style=flat-square)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/docker-lokeshsg%2Flexitag-2496ed?style=flat-square&logo=docker)](https://hub.docker.com/r/lokeshsg/lexitag)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-3b82f6?style=flat-square&logo=python)](https://www.python.org/)
@@ -78,8 +78,8 @@ Discovers DLNA renderers (TVs, speakers, media receivers) on your local network 
 ### 📚 Library Management
 - Multiple source directories with independent enable/disable toggles
 - Configurable table columns: toggle, resize, and re-order (Title, Artist, Album, Genre, Language, Year, Composer, Time, Kbps, Type, Comment, Filename, Path, Status)
-- Smart filters: All · Missing Lyrics · Has Junk · Missing Language · Untouched · Local Fixed · AI Optimized
-- Column sorting on all major fields
+- Smart filters: All · **Recently Added** · Missing Lyrics · Sidecar (`.lrc`) Only · Has Junk · Missing Language · Untouched · Local Fixed · AI Optimized
+- Multi-sort dropdown & column sorting in both **Music Library** and **Album Art Gallery** (`Recently Added`, `Recently Scanned`, `Recently Fixed`, `A → Z`, `Release Year`)
 
 ### ⚡ Batch Processing
 Select any tracks and run an AI fix, lyrics-only, local-only, or filename fix. Real-time progress panel with per-track step indicators. Stop & Clear to recover from a hung job. Accurate abort reporting.
@@ -90,8 +90,12 @@ Every change creates a per-field audit record. The History view shows before/aft
 ### ✏️ Manual Editing
 Click any track to open the metadata editor. Edit any field manually. Bulk edit: select multiple tracks to update a shared field across all at once.
 
-### 🔄 Periodic Auto-Scan Scheduler
-Background library scanner with configurable presets (1 h, 6 h, 12 h, 24 h, 7 d) and custom intervals. Live countdown and last-scan timestamp shown in System Config. Non-blocking — prevents duplicate scans if a manual scan is already running.
+### 👁️ Real-Time Filesystem Monitor (Live Watch) & Auto-Scan Scheduler
+- **Live Filesystem Watcher:** Actively monitors enabled library directories for newly added, modified, or deleted audio files (`SUPPORTED_EXTENSIONS` only — ignores `cover.jpg`, `.lrc`, `.nfo`, and hidden temp files). Includes an **Add & Delete Only** mode designed for safe co-existence with **Jellyfin** and **Navidrome**, a `1.5s` write-settle debounce for large file copies, and automatic self-write suppression when LexiTag modifies or renames files.
+- **Periodic Auto-Scan Scheduler:** Background library scanner with configurable presets (1 h, 6 h, 12 h, 24 h, 7 d) and custom intervals, with a live countdown and last-scan timestamp.
+
+### 🗄️ Database Maintenance & Old Path Cleanup
+Dedicated **Database Maintenance** tools in the full-page `/settings` view to inspect total vs. active vs. out-of-scope tracks, purge stale/orphaned path records from removed library folders, and run non-blocking background SQLite `VACUUM`.
 
 ---
 
@@ -261,4 +265,4 @@ Providers can be added, switched, or disabled from **Settings → AI Providers**
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history with categorized changes.
 
-**Latest: [v0.1.8](CHANGELOG.md#0180--2026-09-11)** — Album Art Gallery, AI Artwork Research Agent, 1-click Morphing Sync, Media Server Sync (Navidrome/Jellyfin), SSRF protection, and more.
+**Latest: [v0.1.9](CHANGELOG.md#019--2026-10-17)** — Real-Time Filesystem Monitor (Live Watch), Database & Old Path Cleanup, Dedicated Settings Page, Recently Added Filter & Sorting, and Dependency Security Upgrades.

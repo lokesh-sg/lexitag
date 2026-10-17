@@ -294,6 +294,11 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
                         counter += 1
                     
                     if str(actual_new_path).lower() != track_path.lower():
+                        try:
+                            from backend.app.services.fs_watcher import suppress_rename
+                            suppress_rename(track_path, str(actual_new_path))
+                        except Exception:
+                            pass
                         shutil.move(track_path, str(actual_new_path))
                         # Also move sidecar .lrc if present
                         old_lrc = Path(track_path).with_suffix(".lrc")
@@ -304,6 +309,11 @@ async def fix_track(track_id: int, batch_id: str = None, progress_callback=None,
                             except Exception:
                                 pass
                         final_path = str(actual_new_path)
+                        try:
+                            from backend.app.services.fs_watcher import suppress_rename
+                            suppress_rename(track_path, final_path)
+                        except Exception:
+                            pass
                         await db.execute("UPDATE tracks SET path = ?, filename = ? WHERE id = ?", (final_path, Path(final_path).name, track_id))
                         await db.commit()
             except Exception as e:

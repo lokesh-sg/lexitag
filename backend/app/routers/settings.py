@@ -586,3 +586,281 @@ async def update_auto_scan_settings(req: AutoScanConfigReq):
         custom_minutes=req.custom_minutes
     )
 
+
+# ── Real-Time Filesystem Watcher Settings ──
+
+class FsWatcherConfigReq(BaseModel):
+    enabled: bool
+    mode: str = "add_delete"  # "add_delete" (Jellyfin/Navidrome safe) or "all" (Add, Delete & Modify)
+    poll_seconds: int = 10
+
+
+@router.get("/fs-watcher")
+async def get_fs_watcher_settings():
+    """Fetch real-time filesystem watcher configuration and live telemetry."""
+    from backend.app.services.fs_watcher import fs_watcher
+    return await fs_watcher.get_status()
+
+
+@router.post("/fs-watcher")
+async def update_fs_watcher_settings(req: FsWatcherConfigReq):
+    """Update real-time filesystem watcher mode, polling interval, and enabled state."""
+    from backend.app.services.fs_watcher import fs_watcher
+    return await fs_watcher.update_config(
+        enabled=req.enabled,
+        mode=req.mode,
+        poll_seconds=req.poll_seconds
+    )
+
+
+# ── Database & Stale Path Cleanup ──
+
+class DatabaseCleanupReq(BaseModel):
+    action: str  # "clear_path", "clear_stale_paths", "clear_missing", "vacuum"
+    path_prefix: str | None = None
+    include_history: bool = True
+
+
+def _extract_location_prefix(path_str: str, configured_sources: list[str]) -> str:
+    """Group a file path under its matching configured source or top-level base folder."""
+    if not path_str:
+        return "Unknown"
+    for src in configured_sources:
+        norm_src = src.rstrip("/")
+        if norm_src and (path_str == norm_src or path_str.startswith(norm_src + "/")):
+            return norm_src
+    parts = [p for p in path_str.split("/") if p]
+    if len(parts) >= 3:
+        return "/" + "/".join(parts[:3])
+    elif len(parts) >= 2:
+        return "/" + "/".join(parts[:2])
+    return path_str
+
+
+@router.get("/database/stats")
+async def get_database_stats():
+    """Return database file info and track/history counts grouped by file location."""
+    import os
+    from backend.app.config import settings as app_cfg
+
+    db = await get_db()
+    db_file = app_cfg.db_path
+    db_size_bytes = 0
+    if os.path.exists(db_file):
+        db_size_bytes += os.path.getsize(db_file)
+    if os.path.exists(db_file + "-wal"):
+        db_size_bytes += os.path.getsize(db_file + "-wal")
+
+    # Fetch configured library sources
+    cursor = await db.execute("SELECT id, path, enabled FROM library_sources")
+    source_rows = await cursor.fetchall()
+    all_sources = {r["path"].rstrip("/"): bool(r["enabled"]) for r in source_rows if r["path"]}
+    source_prefixes = sorted(all_sources.keys(), key=len, reverse=True)
+
+    # Fetch all tracks (path and is_missing)
+    cursor = await db.execute("SELECT path, is_missing FROM tracks")
+    track_rows = await cursor.fetchall()
+
+    # Fetch all history track_paths
+    cursor = await db.execute("SELECT track_path FROM tag_history")
+    history_rows = await cursor.fetchall()
+
+    location_map: dict[str, dict] = {}
+
+    for src_path, is_enabled in all_sources.items():
+        location_map[src_path] = {
+            "path_prefix": src_path,
+            "is_configured_source": True,
+            "is_enabled_source": is_enabled,
+            "exists_on_disk": os.path.isdir(src_path),
+            "total_tracks": 0,
+            "active_tracks": 0,
+            "missing_tracks": 0,
+            "history_count": 0,
+        }
+
+    total_tracks = 0
+    total_active = 0
+    total_missing = 0
+
+    for r in track_rows:
+        p = r["path"] or ""
+        missing = bool(r["is_missing"])
+        prefix = _extract_location_prefix(p, source_prefixes)
+        if prefix not in location_map:
+            location_map[prefix] = {
+                "path_prefix": prefix,
+                "is_configured_source": prefix in all_sources,
+                "is_enabled_source": all_sources.get(prefix, False),
+                "exists_on_disk": os.path.isdir(prefix),
+                "total_tracks": 0,
+                "active_tracks": 0,
+                "missing_tracks": 0,
+                "history_count": 0,
+            }
+        loc = location_map[prefix]
+        loc["total_tracks"] += 1
+        total_tracks += 1
+        if missing:
+            loc["missing_tracks"] += 1
+            total_missing += 1
+        else:
+            loc["active_tracks"] += 1
+            total_active += 1
+
+    total_history = 0
+    for r in history_rows:
+        p = r["track_path"] or ""
+        prefix = _extract_location_prefix(p, source_prefixes)
+        if prefix not in location_map:
+            location_map[prefix] = {
+                "path_prefix": prefix,
+                "is_configured_source": prefix in all_sources,
+                "is_enabled_source": all_sources.get(prefix, False),
+                "exists_on_disk": os.path.isdir(prefix),
+                "total_tracks": 0,
+                "active_tracks": 0,
+                "missing_tracks": 0,
+                "history_count": 0,
+            }
+        location_map[prefix]["history_count"] += 1
+        total_history += 1
+
+    # Sort: configured & enabled first, then by total_tracks descending
+    locations = sorted(
+        location_map.values(),
+        key=lambda x: (not x["is_enabled_source"], not x["is_configured_source"], -x["total_tracks"], -x["history_count"])
+    )
+
+    stale_tracks = sum(loc["total_tracks"] for loc in locations if not loc["is_enabled_source"])
+    stale_history = sum(loc["history_count"] for loc in locations if not loc["is_enabled_source"])
+
+    return {
+        "db_path": db_file,
+        "db_size_bytes": db_size_bytes,
+        "db_size_mb": round(db_size_bytes / (1024 * 1024), 2),
+        "total_tracks": total_tracks,
+        "active_tracks": total_active,
+        "missing_tracks": total_missing,
+        "stale_tracks": stale_tracks,
+        "total_history": total_history,
+        "stale_history": stale_history,
+        "locations": locations,
+    }
+
+
+@router.post("/database/cleanup")
+async def cleanup_database(req: DatabaseCleanupReq):
+    """Purge stale/old path records or missing tracks from the database and reclaim space."""
+    import asyncio
+    from backend.app.config import settings as app_cfg
+
+    db = await get_db()
+    tracks_deleted = 0
+    history_deleted = 0
+
+    try:
+        if req.action == "clear_path":
+            if not req.path_prefix:
+                raise HTTPException(status_code=400, detail="path_prefix is required for clear_path")
+            prefix = req.path_prefix.rstrip("/")
+            like_pattern = f"{prefix}/%"
+
+            if req.include_history:
+                cur = await db.execute(
+                    "DELETE FROM tag_history WHERE track_path = ? OR track_path LIKE ?",
+                    (prefix, like_pattern)
+                )
+                history_deleted += cur.rowcount
+
+            cur = await db.execute(
+                "DELETE FROM tracks WHERE path = ? OR path LIKE ?",
+                (prefix, like_pattern)
+            )
+            tracks_deleted += cur.rowcount
+
+        elif req.action == "clear_stale_paths":
+            # Delete all tracks & history NOT under any enabled library_source
+            cursor = await db.execute("SELECT path FROM library_sources WHERE enabled = 1")
+            enabled_paths = [row["path"].rstrip("/") for row in await cursor.fetchall() if row["path"]]
+            if not enabled_paths:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No enabled library sources found. Enable at least one active source before clearing stale paths."
+                )
+
+            track_conds = " AND ".join(["path NOT LIKE ?" for _ in enabled_paths])
+            track_params = [f"{p}/%" for p in enabled_paths]
+            cur = await db.execute(f"DELETE FROM tracks WHERE {track_conds}", track_params)
+            tracks_deleted += cur.rowcount
+
+            if req.include_history:
+                hist_conds = " AND ".join(["track_path NOT LIKE ?" for _ in enabled_paths])
+                cur = await db.execute(f"DELETE FROM tag_history WHERE {hist_conds}", track_params)
+                history_deleted += cur.rowcount
+
+        elif req.action == "clear_missing":
+            if req.path_prefix:
+                prefix = req.path_prefix.rstrip("/")
+                like_pattern = f"{prefix}/%"
+                if req.include_history:
+                    cur = await db.execute(
+                        "DELETE FROM tag_history WHERE track_id IN (SELECT id FROM tracks WHERE is_missing = 1 AND (path = ? OR path LIKE ?))",
+                        (prefix, like_pattern)
+                    )
+                    history_deleted += cur.rowcount
+                cur = await db.execute(
+                    "DELETE FROM tracks WHERE is_missing = 1 AND (path = ? OR path LIKE ?)",
+                    (prefix, like_pattern)
+                )
+                tracks_deleted += cur.rowcount
+            else:
+                if req.include_history:
+                    cur = await db.execute(
+                        "DELETE FROM tag_history WHERE track_id IN (SELECT id FROM tracks WHERE is_missing = 1)"
+                    )
+                    history_deleted += cur.rowcount
+                cur = await db.execute("DELETE FROM tracks WHERE is_missing = 1")
+                tracks_deleted += cur.rowcount
+
+        elif req.action == "vacuum":
+            await db.execute("VACUUM")
+            await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown cleanup action: {req.action}")
+
+        # Clean up any orphaned tag_history rows whose track_id no longer exists in tracks
+        if req.include_history:
+            cur = await db.execute(
+                "DELETE FROM tag_history WHERE track_id NOT IN (SELECT id FROM tracks)"
+            )
+            history_deleted += cur.rowcount
+
+        await db.commit()
+
+        # Run VACUUM + WAL checkpoint asynchronously in the background so the HTTP response returns immediately
+        async def _bg_compact():
+            try:
+                await asyncio.sleep(0.2)
+                await db.execute("VACUUM")
+                await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except Exception as ve:
+                logging.getLogger("lexitag").warning(f"Background VACUUM warning: {ve}")
+
+        asyncio.create_task(_bg_compact())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database cleanup failed: {str(e)}")
+
+    stats = await get_database_stats()
+    return {
+        "message": "Database cleanup completed successfully",
+        "tracks_deleted": tracks_deleted,
+        "history_deleted": history_deleted,
+        "stats": stats,
+    }
+
+

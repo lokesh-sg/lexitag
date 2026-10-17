@@ -151,6 +151,11 @@ def append_language_genre(file_path, language_word):
             tags['genre'] = genre_list
 
         audio.save()
+        try:
+            from backend.app.services.fs_watcher import suppress_path
+            suppress_path(file_path)
+        except Exception:
+            pass
         return True
     except Exception as e:
         _log(f"Error appending native language genre to {file_path}: {e}")
@@ -171,6 +176,11 @@ def write_tags(filepath: str, tags: dict, lyrics: str = "", language: str = "", 
         True on success, False on failure.
     """
     try:
+        try:
+            from backend.app.services.fs_watcher import suppress_path
+            suppress_path(filepath)
+        except Exception:
+            pass
         ext = Path(filepath).suffix.lower()
         
         # Flatten lyrics if passed as a list accidentally
@@ -180,15 +190,21 @@ def write_tags(filepath: str, tags: dict, lyrics: str = "", language: str = "", 
             lyrics = str(lyrics)
 
         if ext == ".mp3":
-            return _write_id3(filepath, tags, lyrics, language, raw_tags)
+            res = _write_id3(filepath, tags, lyrics, language, raw_tags)
         elif ext == ".flac":
-            return _write_flac(filepath, tags, lyrics, language, raw_tags)
+            res = _write_flac(filepath, tags, lyrics, language, raw_tags)
         elif ext in (".m4a", ".mp4"):
-            return _write_mp4(filepath, tags, lyrics, language, raw_tags)
+            res = _write_mp4(filepath, tags, lyrics, language, raw_tags)
         elif ext == ".wav":
-            return _write_wav(filepath, tags, lyrics, language, raw_tags)
+            res = _write_wav(filepath, tags, lyrics, language, raw_tags)
         else:
-            return _write_generic(filepath, tags, lyrics, language, raw_tags)
+            res = _write_generic(filepath, tags, lyrics, language, raw_tags)
+        try:
+            from backend.app.services.fs_watcher import suppress_path
+            suppress_path(filepath)
+        except Exception:
+            pass
+        return res
     except Exception as e:
         print(f"[tagger] CRITICAL: Error writing tags to {filepath}")
         print(f"[tagger] Exception: {e}")
@@ -826,6 +842,11 @@ def embed_cover_art(filepath: str, image_bytes: bytes, mime_type: str = "image/j
     """Embed cover art into audio file across MP3, FLAC, M4A, WAV, and OGG formats."""
     if not os.path.exists(filepath):
         return False
+    try:
+        from backend.app.services.fs_watcher import suppress_path
+        suppress_path(filepath)
+    except Exception:
+        pass
 
     ext = Path(filepath).suffix.lower()
 
@@ -853,6 +874,11 @@ def embed_cover_art(filepath: str, image_bytes: bytes, mime_type: str = "image/j
                 data=image_bytes
             ))
             id3.save(filepath, v2_version=3)
+            try:
+                from backend.app.services.fs_watcher import suppress_path
+                suppress_path(filepath)
+            except Exception:
+                pass
             return True
 
         elif ext == ".flac":
@@ -866,6 +892,11 @@ def embed_cover_art(filepath: str, image_bytes: bytes, mime_type: str = "image/j
             pic.data = image_bytes
             audio.add_picture(pic)
             audio.save()
+            try:
+                from backend.app.services.fs_watcher import suppress_path
+                suppress_path(filepath)
+            except Exception:
+                pass
             return True
 
         elif ext in {".m4a", ".mp4", ".aac", ".alac"}:
@@ -874,6 +905,11 @@ def embed_cover_art(filepath: str, image_bytes: bytes, mime_type: str = "image/j
             covr_format = MP4Cover.FORMAT_PNG if mime_type == "image/png" else MP4Cover.FORMAT_JPEG
             audio["covr"] = [MP4Cover(image_bytes, imageformat=covr_format)]
             audio.save()
+            try:
+                from backend.app.services.fs_watcher import suppress_path
+                suppress_path(filepath)
+            except Exception:
+                pass
             return True
 
         elif ext == ".wav":
@@ -896,6 +932,11 @@ def embed_cover_art(filepath: str, image_bytes: bytes, mime_type: str = "image/j
                         data=image_bytes
                     ))
                     wave.save()
+                    try:
+                        from backend.app.services.fs_watcher import suppress_path
+                        suppress_path(filepath)
+                    except Exception:
+                        pass
                     return True
             except Exception as e:
                 logger.warning(f"Error embedding cover art into WAV {filepath}: {e}")
@@ -921,6 +962,11 @@ def embed_cover_art(filepath: str, image_bytes: bytes, mime_type: str = "image/j
                 pic.data = image_bytes
                 audio["metadata_block_picture"] = [base64.b64encode(pic.write()).decode("ascii")]
                 audio.save()
+                try:
+                    from backend.app.services.fs_watcher import suppress_path
+                    suppress_path(filepath)
+                except Exception:
+                    pass
                 return True
 
         # Generic MutagenFile fallback
@@ -931,6 +977,11 @@ def embed_cover_art(filepath: str, image_bytes: bytes, mime_type: str = "image/j
                 audio.tags.delall("APIC")
                 audio.tags.add(APIC(encoding=3, mime=mime_type, type=3, desc="Cover", data=image_bytes))
                 audio.save()
+                try:
+                    from backend.app.services.fs_watcher import suppress_path
+                    suppress_path(filepath)
+                except Exception:
+                    pass
                 return True
     except Exception as e:
         print(f"[tagger] Error embedding cover art in {filepath}: {e}")
@@ -942,6 +993,11 @@ def remove_cover_art(filepath: str) -> bool:
     """Remove embedded cover art from audio file."""
     if not os.path.exists(filepath):
         return False
+    try:
+        from backend.app.services.fs_watcher import suppress_path
+        suppress_path(filepath)
+    except Exception:
+        pass
     ext = Path(filepath).suffix.lower()
     try:
         if ext in {".mp3"}:
@@ -950,6 +1006,11 @@ def remove_cover_art(filepath: str) -> bool:
                 id3 = ID3(filepath)
                 id3.delall("APIC")
                 id3.save(filepath, v2_version=3)
+                try:
+                    from backend.app.services.fs_watcher import suppress_path
+                    suppress_path(filepath)
+                except Exception:
+                    pass
                 return True
             except Exception:
                 pass
@@ -958,6 +1019,11 @@ def remove_cover_art(filepath: str) -> bool:
             audio = FLAC(filepath)
             audio.clear_pictures()
             audio.save()
+            try:
+                from backend.app.services.fs_watcher import suppress_path
+                suppress_path(filepath)
+            except Exception:
+                pass
             return True
         elif ext in {".m4a", ".mp4", ".aac"}:
             from mutagen.mp4 import MP4
@@ -965,6 +1031,11 @@ def remove_cover_art(filepath: str) -> bool:
             if "covr" in audio:
                 del audio["covr"]
                 audio.save()
+                try:
+                    from backend.app.services.fs_watcher import suppress_path
+                    suppress_path(filepath)
+                except Exception:
+                    pass
                 return True
         elif ext == ".wav":
             from mutagen.wave import WAVE
@@ -973,6 +1044,11 @@ def remove_cover_art(filepath: str) -> bool:
                 if wave.tags:
                     wave.tags.delall("APIC")
                     wave.save()
+                    try:
+                        from backend.app.services.fs_watcher import suppress_path
+                        suppress_path(filepath)
+                    except Exception:
+                        pass
                     return True
             except Exception:
                 pass
@@ -981,6 +1057,11 @@ def remove_cover_art(filepath: str) -> bool:
             if audio and "metadata_block_picture" in audio:
                 del audio["metadata_block_picture"]
                 audio.save()
+                try:
+                    from backend.app.services.fs_watcher import suppress_path
+                    suppress_path(filepath)
+                except Exception:
+                    pass
                 return True
     except Exception as e:
         print(f"[tagger] Error removing cover art from {filepath}: {e}")

@@ -9,13 +9,30 @@ from backend.app.database import get_db
 
 async def start_fast_refresh(job_id: str, progress_dict: dict):
     """
-    Bg task to refresh has_junk status for all tracks in DB.
+    Bg task to refresh has_junk status for all active tracks in DB.
     Updates progress_dict in-place.
     """
     db = await get_db()
-    
-    # 1. Count tracks
-    cursor = await db.execute("SELECT COUNT(*) as cnt FROM tracks")
+
+    # Only refresh tracks belonging to enabled library_sources and not marked missing
+    cursor = await db.execute("SELECT path FROM library_sources WHERE enabled = 1")
+    enabled_paths = [row["path"] for row in await cursor.fetchall()]
+
+    where_clauses = ["is_missing = 0"]
+    params = []
+    if enabled_paths:
+        path_filters = ["path LIKE ?" for _ in enabled_paths]
+        params.extend([f"{p}%" for p in enabled_paths])
+        where_clauses.append("(" + " OR ".join(path_filters) + ")")
+    else:
+        progress_dict["done"] = True
+        progress_dict["total"] = 0
+        return
+
+    where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    # 1. Count active tracks
+    cursor = await db.execute(f"SELECT COUNT(*) as cnt FROM tracks {where_sql}", params)
     row = await cursor.fetchone()
     total = row["cnt"] if row else 0
     
@@ -35,8 +52,8 @@ async def start_fast_refresh(job_id: str, progress_dict: dict):
     
     while offset < total:
         cursor = await db.execute(
-            "SELECT id, path, filename FROM tracks LIMIT ? OFFSET ?", 
-            (LIMIT, offset)
+            f"SELECT id, path, filename FROM tracks {where_sql} LIMIT ? OFFSET ?", 
+            params + [LIMIT, offset]
         )
         rows = await cursor.fetchall()
         if not rows:
@@ -72,3 +89,4 @@ async def start_fast_refresh(job_id: str, progress_dict: dict):
     progress_dict["done"] = True
     progress_dict["status"] = "completed"
     print(f"[fast_refresh] Finished refresh of {total} tracks.")
+

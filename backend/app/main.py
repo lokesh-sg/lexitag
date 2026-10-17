@@ -45,6 +45,7 @@ class PollingLogFilter(logging.Filter):
             "/api/health",
             "/api/settings/llm/quota",
             "/api/tracks/scan/progress",
+            "/api/settings/fs-watcher",
         ]
         return not any(path in msg for path in silenced_paths)
 
@@ -65,13 +66,16 @@ async def lifespan(app: FastAPI):
     from backend.app.security import migrate_unencrypted_keys
     await migrate_unencrypted_keys()
     
-    # Initialize and start periodic auto-scan background scheduler
+    # Initialize and start periodic auto-scan background scheduler & real-time filesystem watcher
     from backend.app.services.scheduler import auto_scan_scheduler
+    from backend.app.services.fs_watcher import fs_watcher
     auto_scan_scheduler.start()
+    fs_watcher.start()
     
     yield
     
-    # Stop background scheduler and close DB
+    # Stop background scheduler, filesystem watcher, and close DB
+    fs_watcher.stop()
     auto_scan_scheduler.stop()
     await close_db()
     logger.info("Database closed")
@@ -81,7 +85,7 @@ try:
     _version_path = Path(__file__).resolve().parent.parent.parent / "VERSION"
     VERSION = _version_path.read_text().strip()
 except:
-    VERSION = "0.1.8"
+    VERSION = "0.1.9"
 
 
 app = FastAPI(

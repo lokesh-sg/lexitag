@@ -96,14 +96,20 @@ export function useTracks() {
         }
     }, [_subscribeToScanProgress]);
 
-    const handleSort = useCallback((field) => {
+    const handleSort = useCallback((field, explicitDir = null) => {
+        if (explicitDir) {
+            setSortBy(field);
+            setSortDir(explicitDir);
+            setPage(1);
+            return;
+        }
         setSortBy(prev => {
             if (prev === field) {
                 setSortDir(d => d === 'asc' ? 'desc' : 'asc');
                 return field;
             }
-            // For dates and counts, default to DESC (most recent/highest first)
-            const descFields = ['last_fixed_at', 'last_scanned', 'local_fix_count', 'llm_fix_count', 'year'];
+            // For dates, IDs, and counts, default to DESC (most recent/highest first)
+            const descFields = ['id', 'last_fixed_at', 'last_scanned', 'local_fix_count', 'llm_fix_count', 'year'];
             setSortDir(descFields.includes(field) ? 'desc' : 'asc');
             return field;
         });
@@ -133,7 +139,7 @@ export function useTracks() {
     return {
         tracks, total, page, setPage, pageSize, setPageSize,
         search, setSearch, searchField, setSearchField, filter, setFilter,
-        sortBy, sortDir, handleSort,
+        sortBy, sortDir, setSortBy, setSortDir, handleSort,
         loading, scanning, scanProgress, scan, refresh, reload: loadTracks,
     };
 }

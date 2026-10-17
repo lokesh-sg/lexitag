@@ -6,6 +6,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.1.9] — 2026-10-17
+
+### Added
+- **Real-Time Filesystem Monitor (Live Watch)** — Background `FilesystemWatcher` service (`fs_watcher.py`) that actively monitors library source folders for newly added, modified, or deleted audio files (`SUPPORTED_EXTENSIONS` only; ignores `cover.jpg`, `.lrc`, `.nfo`, and hidden temp files). Includes configurable **Add & Delete Only** mode (safe for Jellyfin/Navidrome co-existence), write-settle debounce (`1.5s`), and automatic self-write suppression (`suppress_path` / `suppress_rename`) when LexiTag modifies or renames files.
+- **Database Maintenance & Old Path Cleanup** — Added `/api/settings/database/stats` and `/api/settings/database/cleanup` endpoints plus a dedicated **Database Maintenance** section in Settings to inspect total vs. active vs. out-of-scope tracks, purge stale/orphaned path records, and run non-blocking background SQLite `VACUUM`.
+- **Dedicated `/settings` Page with Sidebar Navigation** — Moved Settings out of the main Library page into its own full-page `/settings` route with a 4-section sidebar (`Library & Scanning`, `AI & Lyrics`, `Automation & Cleanup`, `System & Logs`).
+- **Recently Added Filter & Multi-Sort Controls** — Added a 1-click **Recently Added** filter pill and **Sort** dropdown (`Recently Added`, `Recently Scanned`, `Recently Fixed`, `Title/Artist/Album A → Z`, `Release Year`) in both the **Music Library** and **Album Art Gallery** (supporting both flat tracks and Album/Artist/Folder grouped views).
+
+### Changed
+- **Main Library Header & Action Toolbar** — Organized all track-fixing actions (`AI Fix`, `Lyrics`, `Clean Names`, `Local Fix`, `Fix Names`, `Sync Lang`, `Edit`, `Refresh`, `Scan`) into three clean, permanently accessible pill groups on the Music Library header.
+- **Sticky Bottom Pagination & Player Clearance** — Made the bottom pagination bar sticky above the audio player bar and added bottom scroll clearance (`pb-20`) so page numbers and navigation buttons are never obscured.
+- **Security & Dependency Upgrades** — Upgraded `axios` (`^1.20.0`), `fastapi` (`>=0.143.3`), `uvicorn` (`>=0.54.0`), `pydantic` (`>=2.14.1`), `aiohttp` (`>=3.14.5`), `cryptography` (`>=50.0.2`), `mutagen` (`>=1.48.1`), `postcss-selector-parser` (`^7.1.6`), and `source-map-js` (`^1.2.2`), and hardened `.dockerignore` against local artifacts.
+
+---
+
 ## [0.1.8] — 2026-09-15 (Build 20260915)
 
 ### Added

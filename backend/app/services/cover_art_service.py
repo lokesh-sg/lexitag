@@ -517,7 +517,7 @@ async def _resolve_wikimedia_url_async(url: str) -> str:
                 filename = filename.split("-", 1)[1]
                 
             api_url = f"https://en.wikipedia.org/w/api.php?action=query&titles=File:{urllib.parse.quote(filename)}&prop=imageinfo&iiprop=url&format=json"
-            headers = {"User-Agent": "LexiTag/0.1.8 (https://github.com/lokesh-sg/lexitag; mail@lexitag.app)"}
+            headers = {"User-Agent": "LexiTag/0.1.9 (https://github.com/lokesh-sg/lexitag; mail@lexitag.app)"}
             async with aiohttp.ClientSession(headers=headers) as session:
                 async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
                     if resp.status == 200:
@@ -555,7 +555,7 @@ async def _resolve_discogs_url_async(url: str) -> Optional[str]:
 
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) LexiTag/0.1.8"
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) LexiTag/0.1.9"
         }
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
@@ -576,7 +576,7 @@ async def _extract_url_candidate(url: str) -> Optional[Dict[str, Any]]:
     """Fetch image from a user-supplied web page, Discogs, or Wikipedia URL."""
     try:
         headers = {
-            "User-Agent": "LexiTag/0.1.8 (https://github.com/lokesh-sg/lexitag; mail@lexitag.app) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "LexiTag/0.1.9 (https://github.com/lokesh-sg/lexitag; mail@lexitag.app) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
         }
         if re.search(r"\.(jpe?g|png|webp)(\?.*)?$", url, re.IGNORECASE):
             if await _validate_image_url(url):
@@ -653,7 +653,7 @@ async def _search_wikipedia_candidates(album: str, year: str = "") -> List[Dict[
         return []
     candidates = []
     headers = {
-        "User-Agent": "LexiTag/0.1.8 (https://github.com/lokesh-sg/lexitag; mail@lexitag.app)"
+        "User-Agent": "LexiTag/0.1.9 (https://github.com/lokesh-sg/lexitag; mail@lexitag.app)"
     }
     slugs = []
     clean_alb = re.sub(r"[^\w\s]", "", album).strip().replace(" ", "_")
@@ -698,7 +698,7 @@ async def _validate_image_url(url: str, timeout: int = 8) -> bool:
     url = _normalize_wikimedia_url(url)
     try:
         headers = {
-            "User-Agent": "LexiTag/0.1.8 (https://github.com/lokesh-sg/lexitag; mail@lexitag.app) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "LexiTag/0.1.9 (https://github.com/lokesh-sg/lexitag; mail@lexitag.app) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
         }
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
@@ -879,7 +879,7 @@ async def _search_caa_candidates(album: str = "", artist: str = "") -> List[Dict
         query += f' AND artist:"{artist}"'
 
     url = f"https://musicbrainz.org/ws/2/release/?query={urllib.parse.quote(query)}&fmt=json&limit=3"
-    headers = {"User-Agent": "LexiTag/0.1.8 (https://github.com/lokesh-sg/lexitag)"}
+    headers = {"User-Agent": "LexiTag/0.1.9 (https://github.com/lokesh-sg/lexitag)"}
     candidates: List[Dict[str, Any]] = []
 
     try:
@@ -920,7 +920,7 @@ async def download_image(url: str, timeout: int = 15) -> Tuple[bytes, str]:
         raise ValueError(f"Invalid image URL protocol: {url}")
     url = _normalize_wikimedia_url(url)
     headers = {
-        "User-Agent": "LexiTag/0.1.8 (https://github.com/lokesh-sg/lexitag; mail@lexitag.app) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "LexiTag/0.1.9 (https://github.com/lokesh-sg/lexitag; mail@lexitag.app) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
     }
     async with aiohttp.ClientSession(headers=headers) as session:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:

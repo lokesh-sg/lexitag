@@ -1,27 +1,28 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { useFixerContext } from '../contexts/AppContext';
+import { useFixerContext, useTracksContext } from '../contexts/AppContext';
 import FixerControls from './FixerControls';
 import PlayerBar from './PlayerBar';
 import LyricsPanel from './LyricsPanel';
-import { fetchHealth } from '../api';
 import SelectionHelper from './SelectionHelper';
 
 export default function Layout({ children }) {
   const fixer = useFixerContext();
-  const [version, setVersion] = React.useState('');
-  const [showLyrics, setShowLyrics] = React.useState(false);
+  const tracks = useTracksContext();
+  const [version, setVersion] = useState('');
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [scanMinimized, setScanMinimized] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetch('/api/health')
       .then(res => res.json())
       .then(data => {
         if (data.version) setVersion('v' + data.version);
       })
-      .catch(() => setVersion('v0.1.8'));
+      .catch(() => setVersion('v0.1.9'));
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleToggle = () => setShowLyrics(prev => !prev);
     document.addEventListener('toggle-lyrics', handleToggle);
     return () => document.removeEventListener('toggle-lyrics', handleToggle);
@@ -113,15 +114,102 @@ export default function Layout({ children }) {
                 <span>History</span>
               </span>
             </NavLink>
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                `px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 ${
+                  isActive
+                    ? 'bg-surface-3 text-amber-400 shadow-sm'
+                    : 'text-ink-muted hover:text-ink-rich hover:bg-surface-3/50'
+                }`
+              }
+              id="settings-nav-btn"
+            >
+              <span className="flex items-center gap-1.5 sm:gap-2">
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                <span>Settings</span>
+              </span>
+            </NavLink>
           </nav>
         </div>
       </header>
 
+      {/* Global Scan / Status Refresh Progress Overlay */}
+      {tracks?.scanProgress && (
+        <div className={`fixed top-20 right-6 z-[60] animate-slide-in-right ${scanMinimized ? 'w-auto' : 'w-80'}`}>
+          {scanMinimized ? (
+            <div 
+              onClick={() => setScanMinimized(false)}
+              className="studio-card p-2 flex items-center gap-3 bg-surface-1/95 backdrop-blur-md border-amber-400/30 cursor-pointer hover:bg-surface-2 transition-all shadow-xl"
+            >
+              <div className="w-8 h-8 rounded-full bg-amber-400/10 flex items-center justify-center relative">
+                <svg className="w-4 h-4 text-amber-500 animate-spin-slow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M21 12a9 9 0 11-6.219-8.56" />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-amber-600">
+                  {tracks.scanProgress.total > 0 ? Math.round((tracks.scanProgress.current / tracks.scanProgress.total) * 100) : 0}%
+                </div>
+              </div>
+              <div className="flex flex-col pr-1">
+                <span className="text-[10px] font-bold text-ink-rich uppercase tracking-tight">
+                  {tracks.scanProgress.type === 'refresh' ? 'Refreshing' : 'Scanning'}
+                </span>
+                <span className="text-[9px] text-ink-faint">{tracks.scanProgress.current}/{tracks.scanProgress.total}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="studio-card p-4 border-amber-400/30 bg-surface-1/95 backdrop-blur-md shadow-2xl relative">
+              <button 
+                onClick={() => setScanMinimized(true)}
+                className="absolute top-2 right-2 p-1 rounded text-ink-faint hover:text-ink-normal hover:bg-surface-3 transition-all"
+                title="Minimize"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5" />
+                </svg>
+              </button>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="text-[11px] font-bold text-ink-rich uppercase tracking-wider">
+                    {tracks.scanProgress.type === 'refresh' ? 'Status Refresh in Progress' : 'Library Scan in Progress'}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-amber-500 font-bold bg-amber-400/10 px-1.5 py-0.5 rounded mr-5">
+                  {tracks.scanProgress.total > 0 ? Math.round((tracks.scanProgress.current / tracks.scanProgress.total) * 100) : 0}%
+                </span>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="progress-track h-1.5 bg-surface-3">
+                  <div 
+                    className="progress-fill h-full bg-amber-400 transition-all duration-300" 
+                    style={{ width: `${tracks.scanProgress.total > 0 ? (tracks.scanProgress.current / tracks.scanProgress.total) * 100 : 0}%` }}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between text-[10px]">
+                  <div className="text-ink-muted truncate max-w-[180px]">
+                    {tracks.scanProgress.filename || 'Counting files...'}
+                  </div>
+                  <div className="text-ink-faint font-mono">
+                    {tracks.scanProgress.current} / {tracks.scanProgress.total}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Content Wrapper */}
-      <div className="flex-1 flex overflow-hidden relative w-full max-w-full min-w-0">
+      <div className="flex-1 flex overflow-hidden relative w-full max-w-full min-w-0 pb-20">
         {/* Main Area */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden transition-all duration-300 relative w-full max-w-full min-w-0">
-          <div className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-3 sm:py-6 pb-36 min-w-0">
+          <div className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 pb-12 min-w-0">
             {children}
           </div>
         </main>
@@ -166,4 +254,5 @@ export default function Layout({ children }) {
     </div>
   );
 }
+
 
