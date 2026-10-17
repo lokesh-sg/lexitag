@@ -157,8 +157,6 @@ npm run dev
 # Runs on http://localhost:3010 (proxied to backend on port 3020)
 ```
 
-Or run `./restart.sh` from the repository root.
-
 ---
 
 ## Configuration

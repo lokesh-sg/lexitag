@@ -31,5 +31,6 @@ music/
 **/*.m4a
 **/.DS_Store
 backend/tests/
+backend/app/static/
 
 

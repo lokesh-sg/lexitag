@@ -50,7 +50,11 @@ Thumbs.db
 *.textClipping
 *.bak
 
-# Scratch & Debug Scripts
+# Scratch, Local Maintainer Scripts & Build Output
+restart.sh
+Makefile
+DOCKER_README.md
+backend/app/static/
 backend/debug_*.py
 backend/heal_*.py
 backend/restore_*.py

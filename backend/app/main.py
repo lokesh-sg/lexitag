@@ -99,11 +99,13 @@ app = FastAPI(
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon_ico():
-    return FileResponse(Path(__file__).resolve().parent / "static" / "favicon.svg")
+    prod_fav = Path("/app/static/favicon.svg")
+    return FileResponse(prod_fav if prod_fav.exists() else (Path(__file__).resolve().parent / "static" / "favicon.svg"))
 
 @app.get("/favicon.svg", include_in_schema=False)
 async def favicon_png():
-    return FileResponse(Path(__file__).resolve().parent / "static" / "favicon.svg")
+    prod_fav = Path("/app/static/favicon.svg")
+    return FileResponse(prod_fav if prod_fav.exists() else (Path(__file__).resolve().parent / "static" / "favicon.svg"))
 
 # CORS — restrict to allowed origins
 app.add_middleware(
