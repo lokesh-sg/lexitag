@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { usePlayerContext } from '../contexts/AppContext';
+import { useViewport } from '../hooks/useViewport';
 
 function formatDuration(seconds) {
   if (!seconds || isNaN(seconds)) return '—';
@@ -33,12 +34,22 @@ export default function TrackTable({
   sortBy, sortDir, onSort, onTrackClick, groupBy
 }) {
   const player = usePlayerContext();
+  const viewport = useViewport();
+  const [viewModeOverride, setViewModeOverride] = useState(() => {
+    return localStorage.getItem('lexitag_view_mode') || 'auto';
+  });
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('lexitag_visible_columns');
     return saved ? JSON.parse(saved) : DEFAULT_COLUMNS;
   });
   const menuRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem('lexitag_view_mode', viewModeOverride);
+  }, [viewModeOverride]);
+
+  const isCardView = viewModeOverride === 'cards' || (viewModeOverride === 'auto' && viewport.isCompact);
 
   useEffect(() => {
     localStorage.setItem('lexitag_visible_columns', JSON.stringify(visibleColumns));
@@ -257,6 +268,155 @@ export default function TrackTable({
     );
   }
 
+  const renderStatusBadges = (track) => (
+    <>
+      {track.has_junk ? (
+        <span className="px-1.5 py-0.5 rounded bg-fn-danger/20 text-[#f2746e] text-[9px] font-bold uppercase tracking-wider border border-fn-danger/35 leading-none shrink-0">
+          Junk
+        </span>
+      ) : null}
+      {track.lyrics_source === 'sidecar' ? (
+        <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[9px] font-bold uppercase tracking-wider border border-cyan-500/35 leading-none shrink-0" title="Sidecar .lrc file in folder">
+          📄 Sidecar
+        </span>
+      ) : track.has_lyrics ? (
+        <span className="px-1.5 py-0.5 rounded bg-fn-success/20 text-[#79cb8d] text-[9px] font-bold uppercase tracking-wider border border-fn-success/35 leading-none shrink-0" title="Embedded in audio metadata">
+          LRC
+        </span>
+      ) : (
+        <span className="px-1.5 py-0.5 rounded bg-surface-3 text-ink-muted text-[9px] font-bold uppercase tracking-wider border border-surface-5/50 leading-none shrink-0">
+          No Lyrics
+        </span>
+      )}
+      {track.language && (
+        <span className="px-1.5 py-0.5 rounded bg-surface-3 text-ink-normal text-[9px] font-bold uppercase tracking-wider border border-surface-5/50 leading-none shrink-0">
+          {track.language.substring(0, 3).toUpperCase()}
+        </span>
+      )}
+      {track.llm_fix_count > 0 && (
+        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-400 border border-amber-400/35 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0" title={`AI Optimized ${track.llm_fix_count} time(s)`}>
+          ✨ {track.llm_fix_count}
+        </span>
+      )}
+      {track.local_fix_count > 0 && (
+        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/35 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0" title={`Locally Standardized ${track.local_fix_count} time(s)`}>
+          📦 {track.local_fix_count}
+        </span>
+      )}
+    </>
+  );
+
+  const renderTrackCard = (track, index) => {
+    const isActive = player.currentTrack?.id === track.id;
+    const isSelected = selected.has(track.id);
+
+    return (
+      <div
+        key={track.id}
+        id={`track-row-${index}`}
+        className={`p-3 border-b border-surface-5/15 transition-colors flex items-start gap-2.5 ${
+          isActive ? 'bg-surface-3/60' : 'hover:bg-surface-2/60'
+        } ${isSelected ? 'ring-1 ring-inset ring-amber-400/35 bg-amber-400/5' : ''}`}
+        onClick={(e) => {
+          if (e.target.type === 'checkbox' || e.target.closest('button')) return;
+          handleSelectOne(track, index, e.shiftKey);
+        }}
+      >
+        {/* Checkbox + Play Column */}
+        <div className="flex flex-col items-center gap-2 pt-0.5 shrink-0">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => handleSelectOne(track, index, e.nativeEvent.shiftKey)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 rounded border-surface-5 bg-surface-3 accent-amber-400 cursor-pointer"
+          />
+          <button
+            onClick={(e) => { e.stopPropagation(); player.playTrack(track, tracks); }}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+              isActive
+                ? 'bg-amber-400 text-black shadow-lg shadow-amber-400/20'
+                : 'bg-surface-3 text-ink-normal hover:text-amber-400'
+            }`}
+            title={isActive && player.isPlaying ? "Pause" : "Play"}
+          >
+            {isActive && player.isPlaying ? (
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="6,3 20,12 6,21" className={isActive ? "" : "ml-0.5"} />
+              </svg>
+            )}
+          </button>
+        </div>
+
+        {/* Track Main Details */}
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex items-start justify-between gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTrackClick(track);
+              }}
+              className={`text-left text-sm font-semibold leading-snug line-clamp-2 hover:text-amber-400 transition-colors ${
+                isActive ? 'text-amber-400 font-bold' : 'text-ink-rich'
+              }`}
+            >
+              {track.title || track.filename || 'Untitled'}
+            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[11px] font-mono text-ink-muted tabular-nums">
+                {formatDuration(track.duration)}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTrackClick(track);
+                }}
+                className="p-1.5 rounded-lg bg-surface-2 border border-surface-4 text-ink-muted hover:text-amber-400 hover:border-amber-400/40 transition-colors"
+                title="Inspect & Edit Track"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="text-xs text-ink-normal truncate">
+            <span>{track.artist || 'Unknown Artist'}</span>
+            {track.album && (
+              <>
+                <span className="text-ink-faint mx-1.5">•</span>
+                <span className="text-ink-muted">{track.album}</span>
+              </>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            {renderStatusBadges(track)}
+            {track.genre && (
+              <span className="text-[10px] text-ink-faint truncate max-w-[140px]">
+                {track.genre}
+              </span>
+            )}
+            {track.year && (
+              <span className="text-[10px] font-mono text-ink-faint">
+                ({track.year})
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderTrackRow = (track, index) => {
     const isActive = player.currentTrack?.id === track.id;
     const isSelected = selected.has(track.id);
@@ -280,7 +440,11 @@ export default function TrackTable({
             checked={isSelected}
             onChange={(e) => handleSelectOne(track, index, e.nativeEvent.shiftKey)}
             onClick={(e) => e.stopPropagation()}
-            className="w-3.5 h-3.5 rounded border-surface-5 bg-surface-3 accent-amber-400 cursor-pointer opacity-0 group-hover:opacity-100 checked:opacity-100 transition-opacity"
+            className={`w-3.5 h-3.5 rounded border-surface-5 bg-surface-3 accent-amber-400 cursor-pointer transition-opacity ${
+              viewport.isTouch || viewport.isCompact
+                ? 'opacity-100'
+                : 'opacity-0 group-hover:opacity-100 checked:opacity-100'
+            }`}
           />
         </div>
 
@@ -308,39 +472,7 @@ export default function TrackTable({
             if (col.key === 'last_fixed_at') {
                 return (
                     <div key={col.key} style={{ width }} className="flex flex-wrap items-center gap-x-1.5 gap-y-1 py-1 overflow-hidden shrink-0">
-                        {track.has_junk ? (
-                        <span className="px-1.5 py-0.5 rounded bg-fn-danger/20 text-[#f2746e] text-[9px] font-bold uppercase tracking-wider border border-fn-danger/35 leading-none shrink-0">
-                            Junk
-                        </span>
-                        ) : null}
-                        {track.lyrics_source === 'sidecar' ? (
-                        <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[9px] font-bold uppercase tracking-wider border border-cyan-500/35 leading-none shrink-0" title="Sidecar .lrc file in folder">
-                            📄 Sidecar
-                        </span>
-                        ) : track.has_lyrics ? (
-                        <span className="px-1.5 py-0.5 rounded bg-fn-success/20 text-[#79cb8d] text-[9px] font-bold uppercase tracking-wider border border-fn-success/35 leading-none shrink-0" title="Embedded in audio metadata">
-                            LRC
-                        </span>
-                        ) : (
-                        <span className="px-1.5 py-0.5 rounded bg-surface-3 text-ink-muted text-[9px] font-bold uppercase tracking-wider border border-surface-5/50 leading-none shrink-0">
-                            No Lyrics
-                        </span>
-                        )}
-                        {track.language && (
-                            <span className="px-1.5 py-0.5 rounded bg-surface-3 text-ink-normal text-[9px] font-bold uppercase tracking-wider border border-surface-5/50 leading-none shrink-0">
-                                {track.language.substring(0, 3).toUpperCase()}
-                            </span>
-                        )}
-                        {track.llm_fix_count > 0 && (
-                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-400 border border-amber-400/35 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0" title={`AI Optimized ${track.llm_fix_count} time(s)`}>
-                            ✨ {track.llm_fix_count}
-                        </span>
-                        )}
-                        {track.local_fix_count > 0 && (
-                        <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/35 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0" title={`Locally Standardized ${track.local_fix_count} time(s)`}>
-                            📦 {track.local_fix_count}
-                        </span>
-                        )}
+                        {renderStatusBadges(track)}
                         {track.last_fixed_at && (
                             <span className="text-[10px] text-ink-muted font-mono font-medium whitespace-nowrap shrink-0">
                             {track.last_fixed_at.split(' ')[1].substring(0, 5)} • {track.last_fixed_at.split(' ')[0].split('-').slice(1).join('/')}
@@ -396,8 +528,81 @@ export default function TrackTable({
     );
   };
 
+  if (isCardView) {
+    return (
+      <div className="studio-card w-full max-w-full min-w-0 overflow-hidden">
+        {/* Mobile / Compact Card Header */}
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-surface-5/40 bg-surface-2/70 backdrop-blur-sm sticky top-0 z-20">
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-ink-normal">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={onSelectAll}
+              className="w-4 h-4 rounded border-surface-5 bg-surface-3 accent-amber-400 cursor-pointer"
+            />
+            <span>Select All ({tracks.length})</span>
+          </label>
+
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] font-mono text-ink-faint mr-1 hidden xs:inline">
+              {viewport.width}px
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewModeOverride('table')}
+              className="px-2 py-1 rounded-md bg-surface-3 border border-surface-5 text-[10px] font-bold text-ink-muted hover:text-amber-400 transition-colors flex items-center gap-1"
+              title="Switch to full horizontal table view"
+            >
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="9" y1="21" x2="9" y2="9" />
+              </svg>
+              <span>Table View</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Card Rows */}
+        <div className="divide-y divide-surface-5/20">
+          {groupedTracks ? (
+            Object.entries(groupedTracks).map(([groupName, groupTracks]) => (
+              <React.Fragment key={groupName}>
+                <div className="flex items-center gap-2 px-3 py-2 bg-surface-2/60 border-y border-surface-5/20">
+                  <svg className="w-3.5 h-3.5 text-ink-muted shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span className="text-xs font-semibold text-ink-rich truncate">{groupName}</span>
+                  <span className="text-[10px] text-ink-faint font-semibold bg-surface-4 px-2 py-0.5 rounded-full ml-auto shrink-0">
+                    {groupTracks.length}
+                  </span>
+                </div>
+                {groupTracks.map(track => renderTrackCard(track, trackIndexMap.get(track.id)))}
+              </React.Fragment>
+            ))
+          ) : (
+            tracks.map((track, idx) => renderTrackCard(track, idx))
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="studio-card overflow-x-auto custom-scrollbar w-full max-w-full min-w-0 overscroll-x-contain">
+      {/* Compact bar when Table View is forced on a narrow window */}
+      {viewport.isCompact && viewModeOverride === 'table' && (
+        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-1 border-b border-surface-4 text-[10px] text-ink-muted sticky left-0">
+          <span>Horizontal Table Mode ({viewport.width}px window)</span>
+          <button
+            type="button"
+            onClick={() => setViewModeOverride('auto')}
+            className="px-2 py-0.5 rounded bg-amber-400/15 text-amber-400 border border-amber-400/30 font-bold"
+          >
+            Switch to Mobile Cards
+          </button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-surface-5/40 text-[10px] font-bold text-ink-normal uppercase tracking-wider relative bg-surface-2/70 backdrop-blur-sm sticky top-0 z-30 min-w-max">
         <div className="w-9 flex-shrink-0">
@@ -428,7 +633,19 @@ export default function TrackTable({
                 </button>
                 {showColumnMenu && (
                     <div className="absolute top-full left-0 mt-2 w-56 bg-surface-2 border border-surface-5/20 rounded shadow-2xl z-50 py-3 animate-in fade-in slide-in-from-top-2">
-                        <div className="px-4 py-1 text-[10px] uppercase tracking-[0.2em] text-amber-500 font-bold border-b border-surface-5/10 mb-2">Column Manager</div>
+                        <div className="px-4 py-1 text-[10px] uppercase tracking-[0.2em] text-amber-500 font-bold border-b border-surface-5/10 mb-2 flex items-center justify-between">
+                          <span>Column Manager</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setViewModeOverride('cards');
+                              setShowColumnMenu(false);
+                            }}
+                            className="text-[9px] text-ink-muted hover:text-amber-400 underline"
+                          >
+                            Card Mode
+                          </button>
+                        </div>
                         <div className="max-h-[400px] overflow-y-auto custom-scrollbar px-1">
                             {visibleColumns.map((key) => {
                                 const col = ALL_COLUMNS.find(c => c.key === key);
@@ -514,7 +731,6 @@ export default function TrackTable({
       <div className="divide-y divide-surface-5/20">
         {groupedTracks ? (
           Object.entries(groupedTracks).map(([groupName, groupTracks]) => {
-            // Find global index for each track in group for shift select
             return (
               <React.Fragment key={groupName}>
                 {/* Group Header */}

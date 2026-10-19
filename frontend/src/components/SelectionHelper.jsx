@@ -7,22 +7,31 @@ export default function SelectionHelper() {
   const menuRef = useRef(null);
 
   useEffect(() => {
+    const clampPos = (rawX, rawY) => {
+      const vw = window.innerWidth || 360;
+      const vh = window.innerHeight || 640;
+      const x = Math.max(100, Math.min(vw - 100, rawX));
+      const y = Math.max(160, Math.min(vh - 24, rawY));
+      return { x, y };
+    };
+
     const handleMouseUp = (e) => {
       // Small delay to let the selection settle
       setTimeout(() => {
         const selection = window.getSelection();
-        const text = selection.toString().trim();
+        const text = selection ? selection.toString().trim() : '';
 
-        if (text && text.length > 1) {
+        if (text && text.length > 1 && selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
           const rect = range.getBoundingClientRect();
           
           // Don't show if we're clicking inside the menu itself
           if (menuRef.current && menuRef.current.contains(e.target)) return;
 
+          const pos = clampPos(rect.left + (rect.width / 2), rect.top - 10);
           setMenu({
-            x: rect.left + window.scrollX + (rect.width / 2),
-            y: rect.top + window.scrollY - 10,
+            x: pos.x,
+            y: pos.y,
             text
           });
           setStatus(null);
@@ -42,13 +51,13 @@ export default function SelectionHelper() {
 
     const handleContextMenu = (e) => {
         const selection = window.getSelection();
-        const text = selection.toString().trim();
+        const text = selection ? selection.toString().trim() : '';
         if (text && text.length > 1) {
             e.preventDefault(); // Show our menu instead
-            const rect = e.target.getBoundingClientRect(); // Better placement for context menu
+            const pos = clampPos(e.clientX, e.clientY);
             setMenu({
-                x: e.clientX + window.scrollX,
-                y: e.clientY + window.scrollY,
+                x: pos.x,
+                y: pos.y,
                 text
             });
             setStatus(null);

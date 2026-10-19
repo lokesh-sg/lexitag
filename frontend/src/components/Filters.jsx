@@ -49,14 +49,14 @@ export default function Filters({
   return (
     <div className="studio-card p-2.5 sm:p-3 bg-surface-1 border-surface-4 space-y-2.5">
       {/* Row 1: Search Input + Sort + View Options + Compact Pagination */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-2 sm:gap-2.5">
         {/* Search Bar */}
-        <div className="relative flex-1 min-w-[240px] max-w-md flex items-center group">
+        <div className="relative flex-1 min-w-0 sm:min-w-[240px] sm:max-w-md flex items-center group">
           <div className="absolute left-1 top-1/2 -translate-y-1/2 z-10">
             <select
               value={searchField}
               onChange={(e) => onSearchFieldChange(e.target.value)}
-              className="appearance-none bg-surface-3 border-none text-[10px] font-bold text-amber-400 uppercase tracking-tighter pl-2 pr-4 py-1.5 rounded-md hover:bg-surface-4 cursor-pointer focus:ring-0 focus:outline-none transition-all w-[86px] truncate"
+              className="appearance-none bg-surface-3 border-none text-[10px] font-bold text-amber-400 uppercase tracking-tighter pl-2 pr-4 py-1.5 rounded-md hover:bg-surface-4 cursor-pointer focus:ring-0 focus:outline-none transition-all w-[76px] sm:w-[86px] truncate"
               title="Search Field"
             >
               {searchFields.map(f => (
@@ -76,7 +76,7 @@ export default function Filters({
             placeholder={searchField === 'all' ? "Search title, artist, album, file..." : `Search in ${searchField}...`}
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            className="input-field !pl-[92px] pr-[56px] !text-xs !h-9 border-surface-5/60 focus:border-amber-400/50 w-full bg-surface-0"
+            className="input-field !pl-[82px] sm:!pl-[92px] pr-[52px] sm:pr-[56px] !text-xs !h-9 border-surface-5/60 focus:border-amber-400/50 w-full bg-surface-0"
             id="search-input"
           />
           <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
@@ -106,129 +106,136 @@ export default function Filters({
         </div>
 
         {/* Right Controls: Sort By + Grouping + Page Size + Inline Pagination */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {/* Sort By Dropdown */}
-          {onSortChange && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold uppercase text-ink-faint tracking-wider hidden xl:inline">Sort:</span>
-              <div className="relative">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between sm:justify-end gap-1.5 sm:gap-2 w-full sm:w-auto">
+          <div className="grid grid-cols-12 sm:flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+            {/* Sort By Dropdown */}
+            {onSortChange && (
+              <div className="col-span-5 sm:w-auto flex items-center gap-1.5 min-w-0">
+                <span className="text-[10px] font-bold uppercase text-ink-faint tracking-wider hidden xl:inline">Sort:</span>
+                <div className="relative w-full sm:w-auto">
+                  <select
+                    value={SORT_PRESETS.some(p => p.value === currentSortKey) ? currentSortKey : 'custom'}
+                    onChange={(e) => {
+                      if (e.target.value === 'custom') return;
+                      const [field, dir] = e.target.value.split(':');
+                      onSortChange(field, dir);
+                    }}
+                    className="w-full sm:w-auto appearance-none bg-surface-0 border border-surface-4 text-ink-rich text-[11px] sm:text-xs font-semibold rounded-lg px-2 sm:px-2.5 py-1.5 pr-5 sm:pr-7 focus:outline-none focus:border-amber-400/50 hover:border-surface-5 cursor-pointer transition-all truncate"
+                    id="sort-by-select"
+                  >
+                    {SORT_PRESETS.map(p => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                    {!SORT_PRESETS.some(p => p.value === currentSortKey) && (
+                      <option value="custom">Custom ({sortBy} {sortDir.toUpperCase()})</option>
+                    )}
+                  </select>
+                  <svg
+                    className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-muted pointer-events-none"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+              </div>
+            )}
+
+            {/* Group By Dropdown */}
+            <div className="col-span-4 sm:w-auto flex items-center gap-1.5 min-w-0">
+              <span className="text-[10px] font-bold uppercase text-ink-faint tracking-wider hidden xl:inline">View:</span>
+              <div className="relative w-full sm:w-auto">
                 <select
-                  value={SORT_PRESETS.some(p => p.value === currentSortKey) ? currentSortKey : 'custom'}
-                  onChange={(e) => {
-                    if (e.target.value === 'custom') return;
-                    const [field, dir] = e.target.value.split(':');
-                    onSortChange(field, dir);
-                  }}
-                  className="appearance-none bg-surface-0 border border-surface-4 text-ink-rich text-xs font-semibold rounded-lg px-2.5 py-1.5 pr-7 focus:outline-none focus:border-amber-400/50 hover:border-surface-5 cursor-pointer transition-all"
-                  id="sort-by-select"
+                  value={groupBy}
+                  onChange={(e) => onGroupBy(e.target.value)}
+                  className="w-full sm:w-auto appearance-none bg-surface-0 border border-surface-4 text-ink-rich text-[11px] sm:text-xs font-semibold rounded-lg px-2 sm:px-2.5 py-1.5 pr-5 sm:pr-7 focus:outline-none focus:border-amber-400/50 hover:border-surface-5 cursor-pointer transition-all truncate"
+                  id="group-by-select"
                 >
-                  {SORT_PRESETS.map(p => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                  {!SORT_PRESETS.some(p => p.value === currentSortKey) && (
-                    <option value="custom">Custom ({sortBy} {sortDir.toUpperCase()})</option>
-                  )}
+                  <option value="">Flat Track List</option>
+                  <option value="folder">Group by Folder</option>
                 </select>
                 <svg
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-muted pointer-events-none"
+                  className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-muted pointer-events-none"
                   viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                 >
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
               </div>
             </div>
-          )}
 
-          {/* Group By Dropdown */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold uppercase text-ink-faint tracking-wider hidden xl:inline">View:</span>
-            <div className="relative">
-              <select
-                value={groupBy}
-                onChange={(e) => onGroupBy(e.target.value)}
-                className="appearance-none bg-surface-0 border border-surface-4 text-ink-rich text-xs font-semibold rounded-lg px-2.5 py-1.5 pr-7 focus:outline-none focus:border-amber-400/50 hover:border-surface-5 cursor-pointer transition-all"
-                id="group-by-select"
-              >
-                <option value="">Flat Track List</option>
-                <option value="folder">Group by Folder</option>
-              </select>
-              <svg
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-muted pointer-events-none"
-                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              >
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </div>
-          </div>
-
-          {/* Page Size */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold uppercase text-ink-faint tracking-wider hidden sm:inline">Rows:</span>
-            <div className="relative">
-              <select
-                value={pageSize}
-                onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="appearance-none bg-surface-0 border border-surface-4 text-ink-rich text-xs font-semibold rounded-lg px-2.5 py-1.5 pr-6 focus:outline-none focus:border-amber-400/50 hover:border-surface-5 cursor-pointer transition-all font-mono"
-                id="page-size-select"
-              >
-                {[50, 100, 250, 500, 1000].map(val => (
-                  <option key={val} value={val}>{val}</option>
-                ))}
-              </select>
-              <svg
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-muted pointer-events-none"
-                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              >
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
+            {/* Page Size */}
+            <div className="col-span-3 sm:w-auto flex items-center gap-1.5 min-w-0">
+              <span className="text-[10px] font-bold uppercase text-ink-faint tracking-wider hidden sm:inline">Rows:</span>
+              <div className="relative w-full sm:w-auto">
+                <select
+                  value={pageSize}
+                  onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                  className="w-full sm:w-auto appearance-none bg-surface-0 border border-surface-4 text-ink-rich text-[11px] sm:text-xs font-semibold rounded-lg px-2 sm:px-2.5 py-1.5 pr-5 sm:pr-6 focus:outline-none focus:border-amber-400/50 hover:border-surface-5 cursor-pointer transition-all font-mono truncate"
+                  id="page-size-select"
+                >
+                  {[50, 100, 250, 500, 1000].map(val => (
+                    <option key={val} value={val}>{val} rows</option>
+                  ))}
+                </select>
+                <svg
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-muted pointer-events-none"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                >
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
             </div>
           </div>
 
           {/* Compact Inline Pagination */}
           {total > pageSize && onPageChange && (
-            <div className="flex items-center gap-1 pl-1 border-l border-surface-4">
-              <button
-                onClick={() => onPageChange(1)}
-                disabled={page <= 1}
-                className="px-2 py-1 rounded-md bg-surface-0 border border-surface-4 hover:border-amber-400/40 text-[10px] font-bold text-ink-muted hover:text-ink-rich disabled:opacity-30 transition-all uppercase"
-                title="First Page"
-              >
-                «
-              </button>
-              <button
-                onClick={() => onPageChange(Math.max(1, page - 1))}
-                disabled={page <= 1}
-                className="px-2 py-1 rounded-md bg-surface-0 border border-surface-4 hover:border-amber-400/40 text-xs font-bold text-ink-normal disabled:opacity-30 transition-all"
-                title="Previous Page"
-              >
-                ‹
-              </button>
-              <span className="px-2.5 py-1 rounded-md bg-surface-2 border border-surface-4 text-[11px] font-mono font-bold text-amber-400 tabular-nums whitespace-nowrap">
-                {page} <span className="text-ink-faint font-normal">/</span> {totalPages}
+            <div className="flex items-center justify-between sm:justify-start gap-1 sm:pl-1 sm:border-l border-surface-4 bg-surface-0/60 sm:bg-transparent px-2 py-1 sm:p-0 rounded-lg border sm:border-0 border-surface-4/70">
+              <span className="text-[10px] font-mono text-ink-muted sm:hidden">
+                Page <strong className="text-amber-400">{page}</strong> of {totalPages}
               </span>
-              <button
-                onClick={() => onPageChange(page + 1)}
-                disabled={page >= totalPages}
-                className="px-2 py-1 rounded-md bg-surface-0 border border-surface-4 hover:border-amber-400/40 text-xs font-bold text-ink-normal disabled:opacity-30 transition-all"
-                title="Next Page"
-              >
-                ›
-              </button>
-              <button
-                onClick={() => onPageChange(totalPages)}
-                disabled={page >= totalPages}
-                className="px-2 py-1 rounded-md bg-surface-0 border border-surface-4 hover:border-amber-400/40 text-[10px] font-bold text-ink-muted hover:text-ink-rich disabled:opacity-30 transition-all uppercase"
-                title="Last Page"
-              >
-                »
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onPageChange(1)}
+                  disabled={page <= 1}
+                  className="px-2 py-1 rounded-md bg-surface-0 border border-surface-4 hover:border-amber-400/40 text-[10px] font-bold text-ink-muted hover:text-ink-rich disabled:opacity-30 transition-all uppercase"
+                  title="First Page"
+                >
+                  «
+                </button>
+                <button
+                  onClick={() => onPageChange(Math.max(1, page - 1))}
+                  disabled={page <= 1}
+                  className="px-2.5 py-1 rounded-md bg-surface-0 border border-surface-4 hover:border-amber-400/40 text-xs font-bold text-ink-normal disabled:opacity-30 transition-all"
+                  title="Previous Page"
+                >
+                  ‹
+                </button>
+                <span className="hidden sm:inline-block px-2.5 py-1 rounded-md bg-surface-2 border border-surface-4 text-[11px] font-mono font-bold text-amber-400 tabular-nums whitespace-nowrap">
+                  {page} <span className="text-ink-faint font-normal">/</span> {totalPages}
+                </span>
+                <button
+                  onClick={() => onPageChange(page + 1)}
+                  disabled={page >= totalPages}
+                  className="px-2.5 py-1 rounded-md bg-surface-0 border border-surface-4 hover:border-amber-400/40 text-xs font-bold text-ink-normal disabled:opacity-30 transition-all"
+                  title="Next Page"
+                >
+                  ›
+                </button>
+                <button
+                  onClick={() => onPageChange(totalPages)}
+                  disabled={page >= totalPages}
+                  className="px-2 py-1 rounded-md bg-surface-0 border border-surface-4 hover:border-amber-400/40 text-[10px] font-bold text-ink-muted hover:text-ink-rich disabled:opacity-30 transition-all uppercase"
+                  title="Last Page"
+                >
+                  »
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
 
       {/* Row 2: Clean Segmented Filter Tabs */}
-      <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-surface-4/60 overflow-x-auto scrollbar-none">
+      <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-surface-4/60 overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-1 min-w-0">
           <span className="text-[10px] font-bold uppercase tracking-wider text-ink-faint mr-1 hidden sm:inline shrink-0">
             Filter:

@@ -189,14 +189,25 @@ export default function HistoryView() {
         </div>
 
         {total > pageSize && (
-            <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                <button onClick={() => setPage(1)} disabled={page <= 1} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">First</button>
-                <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page <= 1} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">←</button>
-                <div className="px-3 py-1 rounded-lg bg-surface-3 border border-surface-4 text-[10px] font-black text-amber-500 tabular-nums">
-                    {page} / {Math.ceil(total / pageSize)}
+            <div className="flex items-center justify-between sm:justify-end gap-1.5 w-full sm:w-auto bg-surface-2 sm:bg-transparent p-1.5 sm:p-0 rounded-xl border border-surface-4 sm:border-0">
+                <span className="sm:hidden text-[11px] font-semibold text-ink-muted pl-1.5">
+                  Page <span className="text-amber-400 font-bold">{page}</span> of {Math.ceil(total / pageSize)}
+                </span>
+                <div className="flex items-center gap-1 sm:gap-1.5">
+                  <button onClick={() => setPage(1)} disabled={page <= 1} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">
+                    <span className="sm:hidden">«</span>
+                    <span className="hidden sm:inline">First</span>
+                  </button>
+                  <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page <= 1} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">←</button>
+                  <div className="hidden sm:block px-3 py-1 rounded-lg bg-surface-3 border border-surface-4 text-[10px] font-black text-amber-500 tabular-nums">
+                      {page} / {Math.ceil(total / pageSize)}
+                  </div>
+                  <button onClick={() => setPage(p => p+1)} disabled={page * pageSize >= total} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">→</button>
+                  <button onClick={() => setPage(Math.ceil(total / pageSize))} disabled={page * pageSize >= total} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">
+                    <span className="sm:hidden">»</span>
+                    <span className="hidden sm:inline">Last</span>
+                  </button>
                 </div>
-                <button onClick={() => setPage(p => p+1)} disabled={page * pageSize >= total} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">→</button>
-                <button onClick={() => setPage(Math.ceil(total / pageSize))} disabled={page * pageSize >= total} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">Last</button>
             </div>
         )}
       </div>
@@ -270,7 +281,7 @@ export default function HistoryView() {
             group.type === 'batch' ? (
               /* Batch Cluster */
               <div key={group.batch_id} className="rounded-2xl bg-surface-2 border border-surface-4 shadow-sm overflow-hidden">
-                <div className="px-4 py-3 bg-surface-3 flex items-center justify-between border-b border-surface-4">
+                <div className="px-3.5 sm:px-4 py-3 bg-surface-3 flex flex-wrap items-center justify-between gap-2 border-b border-surface-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
@@ -283,7 +294,7 @@ export default function HistoryView() {
                   {group.entries.some(e => !e.reverted) && (
                     <button 
                       onClick={() => setConfirmingAction({ type: 'batch', id: group.batch_id })}
-                      className="text-[10px] font-bold text-amber-500 hover:bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/30 transition-all"
+                      className="text-[10px] font-bold text-amber-500 hover:bg-amber-500/10 px-2.5 sm:px-3 py-1.5 rounded-lg border border-amber-500/30 transition-all"
                     >
                       Revert Entire Batch
                     </button>
@@ -341,14 +352,26 @@ export default function HistoryView() {
           <p className="text-xs text-ink-muted">
             {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
           </p>
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => setPage(1)} disabled={page <= 1} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">First</button>
-            <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page <= 1} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">← Prev</button>
-            <div className="px-3 py-1 rounded-lg bg-surface-3 border border-surface-4 text-[10px] font-black text-amber-500 tabular-nums">
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <button onClick={() => setPage(1)} disabled={page <= 1} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">
+              <span className="sm:hidden">«</span>
+              <span className="hidden sm:inline">First</span>
+            </button>
+            <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page <= 1} className="p-1 px-2 sm:px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">
+              <span className="sm:hidden">←</span>
+              <span className="hidden sm:inline">← Prev</span>
+            </button>
+            <div className="px-2.5 sm:px-3 py-1 rounded-lg bg-surface-3 border border-surface-4 text-[10px] font-black text-amber-500 tabular-nums">
                 {page} / {Math.ceil(total / pageSize)}
             </div>
-            <button onClick={() => setPage(p => p+1)} disabled={page * pageSize >= total} className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">Next →</button>
-            <button onClick={() => setPage(Math.ceil(total / pageSize))} disabled={page * pageSize >= total} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">Last</button>
+            <button onClick={() => setPage(p => p+1)} disabled={page * pageSize >= total} className="p-1 px-2 sm:px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted">
+              <span className="sm:hidden">→</span>
+              <span className="hidden sm:inline">Next →</span>
+            </button>
+            <button onClick={() => setPage(Math.ceil(total / pageSize))} disabled={page * pageSize >= total} className="p-1 px-2 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter">
+              <span className="sm:hidden">»</span>
+              <span className="hidden sm:inline">Last</span>
+            </button>
           </div>
         </div>
       )}
@@ -397,18 +420,18 @@ function HistoryItem({ entry, isSelected, onSelect, isExpanded, onExpand, onReve
         ) : (
           <button 
             onClick={(e) => { e.stopPropagation(); onRevert(); }}
-            className="opacity-0 group-hover:opacity-100 btn-ghost !text-[10px] !py-1 !px-2 text-fn-danger hover:bg-fn-danger/10"
+            className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 btn-ghost !text-[10px] !py-1 !px-2 text-fn-danger hover:bg-fn-danger/10 shrink-0"
           >
             Revert
           </button>
         )}
 
-        <svg className={`w-3 h-3 text-ink-faint transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="6 9 12 15 18 9" /></svg>
+        <svg className={`w-3 h-3 text-ink-faint transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="6 9 12 15 18 9" /></svg>
       </div>
 
       {isExpanded && (
-        <div className="px-6 py-4 bg-surface-0 border-t border-surface-4 animate-fade-in">
-           <div className="grid grid-cols-2 gap-8">
+        <div className="px-3.5 sm:px-6 py-4 bg-surface-0 border-t border-surface-4 animate-fade-in">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
               <div>
                 <h4 className="text-[10px] font-black uppercase text-fn-danger/70 mb-3 tracking-widest">Original</h4>
                 <div className="space-y-1.5">

@@ -82,6 +82,7 @@ LexiTag scans your local audio files, strips spam and promotional watermarks fro
 - **Recently Added & Multi-Sort**: Quickly view newly imported music in both the Library and Album Art pages, or sort by title, artist, album, year, scan time, or fix time.
 - **Database Cleanup**: Dedicated maintenance tools in `/settings` to inspect total vs. active tracks, purge orphaned records from old or removed directory paths, and run non-blocking SQLite `VACUUM` to reclaim disk space.
 - **Change History & Revert**: Every tag edit is logged with before/after values so you can revert individual fields, tracks, or entire batches at any time.
+- **Adaptive Mobile & Multi-Viewport UI**: Automatically detects screen dimensions and touch/pointer capabilities (`320px` phones, tablets, laptops, and ultra-wide monitors) to render touch-friendly track cards, symmetrical action toolbars, 2-column mobile album grids, and responsive modals.
 - **Built-in Audio Player & UPnP/DLNA Casting**: Play tracks directly in the browser with HTTP Range seek support, or cast to DLNA renderers on your LAN.
 
 ---
@@ -188,5 +189,6 @@ Settings can be configured via `.env` or directly in the web UI under **Settings
 
 See [CHANGELOG.md](CHANGELOG.md) for full release notes.
 
-**Latest Release: [v0.1.9](CHANGELOG.md#019--2026-10-17)** — Real-Time Filesystem Monitor (Live Watch), Database & Old Path Cleanup, Dedicated Settings Page, Recently Added Filter & Sorting, and Dependency Security Updates.
+**Latest Release: [v0.1.9 (Build 20261018)](CHANGELOG.md#019--2026-10-18-build-20261018)** — Adaptive Mobile & Multi-Viewport Responsive UI, Real-Time Filesystem Monitor (Live Watch), Database & Old Path Cleanup, Dedicated Settings Page, Recently Added Filter & Sorting, and Dependency Security Updates.
+
 

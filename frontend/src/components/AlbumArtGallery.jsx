@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { fetchTracks, fetchTrackGroups, getTrackCoverUrl, searchAiCover, applyTrackCover, batchAiCover, syncFolderCoverArt, syncGroupCover, fetchActiveScanJobs, batchRemoveCover } from '../api';
+import { useViewport } from '../hooks/useViewport';
 import TrackMetadataModal from './TrackMetadataModal';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -86,6 +87,7 @@ function extractErrorMsg(err, fallback = 'Operation failed') {
 }
 
 export default function AlbumArtGallery() {
+  const viewport = useViewport();
   const [tracks, setTracks] = useState([]);
   const [total, setTotal] = useState(0);
   const [serverGroups, setServerGroups] = useState([]);
@@ -761,29 +763,31 @@ export default function AlbumArtGallery() {
   const isAllCurrentSelected = tracks.length > 0 && tracks.every(t => selectedIds.has(t.id));
 
   return (
-    <div className="space-y-4 pb-32">
+    <div className="space-y-3 sm:space-y-4 pb-32">
       {/* Top Toolbar */}
-      <div className="bg-surface-1/90 backdrop-blur-md border border-surface-5/40 rounded-2xl px-4 sm:px-6 py-4 space-y-3 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-surface-1/90 backdrop-blur-md border border-surface-5/40 rounded-2xl px-3 sm:px-6 py-3 sm:py-4 space-y-2.5 sm:space-y-3 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
           {/* Title & Stats */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400 shrink-0">
               <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
                 <polyline points="21 15 16 10 5 21"/>
               </svg>
             </div>
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-ink-rich flex items-center gap-2">
-                Album Art Gallery
-                <span className="text-xs font-normal text-ink-muted">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <h2 className="text-sm sm:text-base font-bold text-ink-rich whitespace-nowrap">
+                  Album Art Gallery
+                </h2>
+                <span className="text-[11px] sm:text-xs font-normal text-ink-muted truncate">
                   {groupBy !== 'none'
-                    ? `(${totalGroups.toLocaleString()} ${groupBy === 'folder' ? 'folders' : `${groupBy}s`}, ${totalTracksCount.toLocaleString()} ${filter === 'missing_cover' ? 'missing tracks' : 'tracks'})`
+                    ? `(${totalGroups.toLocaleString()} ${groupBy === 'folder' ? 'folders' : `${groupBy}s`} · ${totalTracksCount.toLocaleString()} ${filter === 'missing_cover' ? 'missing' : 'tracks'})`
                     : `(${total.toLocaleString()} ${filter === 'missing_cover' ? 'missing tracks' : 'tracks'})`
                   }
                 </span>
-              </h2>
+              </div>
               <p className="text-[11px] text-ink-muted hidden sm:block">
                 View embedded album artwork, select multiple tracks, and pull official covers using Google AI.
               </p>
@@ -791,8 +795,8 @@ export default function AlbumArtGallery() {
           </div>
 
           {/* Search Bar & Top Pagination */}
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <div className="relative w-full sm:w-64">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
               <input
                 type="text"
                 value={search}
@@ -811,56 +815,65 @@ export default function AlbumArtGallery() {
             </div>
 
             {/* Top Pagination Bar */}
-            <div className="flex items-center gap-1 bg-surface-2/90 border border-surface-5/50 rounded-lg px-2 py-1 text-xs">
-              <button
-                onClick={() => setPage(1)}
-                disabled={page <= 1}
-                className="px-1.5 py-0.5 rounded text-[10px] font-black text-ink-muted hover:text-ink-rich disabled:opacity-30 uppercase tracking-tighter"
-                title="First Page"
-              >
-                First
-              </button>
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-4 disabled:opacity-30 text-ink-rich font-bold text-xs"
-                title="Previous Page"
-              >
-                ← Prev
-              </button>
-              <div className="px-2.5 py-0.5 rounded bg-surface-3 border border-surface-4 text-[11px] font-black text-amber-400 tabular-nums">
-                {page} / {totalPages}
+            <div className="flex items-center justify-between sm:justify-start gap-1 bg-surface-2/90 border border-surface-5/50 rounded-lg px-2.5 sm:px-2 py-1 text-xs">
+              <span className="sm:hidden text-[11px] font-semibold text-ink-muted">
+                Page <span className="text-amber-400 font-bold">{page}</span> of {totalPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(1)}
+                  disabled={page <= 1}
+                  className="px-1.5 py-0.5 rounded text-[10px] font-black text-ink-muted hover:text-ink-rich disabled:opacity-30 uppercase tracking-tighter"
+                  title="First Page"
+                >
+                  <span className="hidden sm:inline">First</span>
+                  <span className="sm:hidden">«</span>
+                </button>
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-4 disabled:opacity-30 text-ink-rich font-bold text-xs"
+                  title="Previous Page"
+                >
+                  <span className="hidden sm:inline">← Prev</span>
+                  <span className="sm:hidden">‹</span>
+                </button>
+                <div className="hidden sm:block px-2.5 py-0.5 rounded bg-surface-3 border border-surface-4 text-[11px] font-black text-amber-400 tabular-nums whitespace-nowrap">
+                  {page} / {totalPages}
+                </div>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-4 disabled:opacity-30 text-ink-rich font-bold text-xs"
+                  title="Next Page"
+                >
+                  <span className="hidden sm:inline">Next →</span>
+                  <span className="sm:hidden">›</span>
+                </button>
+                <button
+                  onClick={() => setPage(totalPages)}
+                  disabled={page >= totalPages}
+                  className="px-1.5 py-0.5 rounded text-[10px] font-black text-ink-muted hover:text-ink-rich disabled:opacity-30 uppercase tracking-tighter"
+                  title="Last Page"
+                >
+                  <span className="hidden sm:inline">Last</span>
+                  <span className="sm:hidden">»</span>
+                </button>
               </div>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-4 disabled:opacity-30 text-ink-rich font-bold text-xs"
-                title="Next Page"
-              >
-                Next →
-              </button>
-              <button
-                onClick={() => setPage(totalPages)}
-                disabled={page >= totalPages}
-                className="px-1.5 py-0.5 rounded text-[10px] font-black text-ink-muted hover:text-ink-rich disabled:opacity-30 uppercase tracking-tighter"
-                title="Last Page"
-              >
-                Last
-              </button>
             </div>
           </div>
         </div>
 
         {/* Filters and Selection Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 border-t border-surface-5/20">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Filter Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar py-0.5">
+        <div className="flex flex-col lg:flex-row lg:flex-wrap items-stretch lg:items-center justify-between gap-2 pt-2 border-t border-surface-5/20">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 min-w-0">
+            {/* Filter Chips — Symmetrical 4-column grid on mobile, inline flex on desktop */}
+            <div className="grid grid-cols-4 sm:flex items-center gap-1 sm:gap-1.5 min-w-0">
               {[
-                { id: 'all', label: 'All Tracks' },
-                { id: 'recently_added', label: 'Recently Added', icon: true },
-                { id: 'missing_cover', label: 'Missing Cover Art' },
-                { id: 'has_cover', label: 'Has Cover Art' },
+                { id: 'all', label: 'All Tracks', shortLabel: 'All' },
+                { id: 'recently_added', label: 'Recently Added', shortLabel: 'Recent', icon: true },
+                { id: 'missing_cover', label: 'Missing Cover Art', shortLabel: 'Missing' },
+                { id: 'has_cover', label: 'Has Cover Art', shortLabel: 'Has Art' },
               ].map(f => (
                 <button
                   key={f.id}
@@ -869,121 +882,140 @@ export default function AlbumArtGallery() {
                     if (f.id === 'recently_added') setSortBy('recently_added');
                     setPage(1);
                   }}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  className={`px-1.5 sm:px-3 py-1.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-all flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 ${
                     filter === f.id
-                      ? 'bg-amber-400 text-surface-0 shadow-sm'
+                      ? 'bg-amber-400 text-surface-0 shadow-sm font-bold'
                       : 'bg-surface-2 hover:bg-surface-3 text-ink-normal border border-surface-5/40'
                   }`}
                 >
                   {f.icon && (
-                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 hidden min-[380px]:inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
                   )}
-                  {f.label}
+                  <span className="sm:hidden truncate">{f.shortLabel}</span>
+                  <span className="hidden sm:inline">{f.label}</span>
                 </button>
               ))}
             </div>
 
-            {/* Sort By Selector */}
-            <div className="flex items-center gap-1 bg-surface-2 border border-surface-5/40 rounded-lg px-2 py-1 text-xs">
-              <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 18V4" />
-              </svg>
-              <span className="text-[10px] font-bold text-ink-muted uppercase hidden sm:inline">Sort:</span>
-              <select
-                value={filter === 'recently_added' ? 'recently_added' : sortBy}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSortBy(val);
-                  if (filter === 'recently_added' && val !== 'recently_added') {
-                    setFilter('all');
-                  }
-                  setPage(1);
-                }}
-                className="bg-transparent text-xs font-bold text-ink-rich focus:outline-none cursor-pointer pr-1"
-                title="Sort gallery items"
-              >
-                <option value="alpha" className="bg-surface-2 text-ink-rich">A → Z</option>
-                <option value="recently_added" className="bg-surface-2 text-ink-rich">Recently Added (Newest)</option>
-                <option value="last_scanned" className="bg-surface-2 text-ink-rich">Recently Scanned</option>
-                <option value="year" className="bg-surface-2 text-ink-rich">Release Year (Newest)</option>
-              </select>
-            </div>
-
-            {/* Group By Selector */}
-            <div className="flex items-center gap-1 bg-surface-2 border border-surface-5/40 rounded-lg p-0.5 text-xs">
-              <span className="text-[10px] font-bold text-ink-muted uppercase px-1.5 hidden sm:inline">Group:</span>
-              {[
-                { id: 'none', label: 'None', title: 'No Grouping — Show individual tracks' },
-                { id: 'album', label: 'Album', title: 'Group tracks by Album' },
-                { id: 'artist', label: 'Artist', title: 'Group tracks by Artist' },
-                { id: 'folder', label: 'Folder', title: 'Group tracks by Folder' },
-              ].map(g => (
-                <button
-                  key={g.id}
-                  onClick={() => { setGroupBy(g.id); setPage(1); }}
-                  title={g.title}
-                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
-                    groupBy === g.id
-                      ? 'bg-amber-400 text-surface-0 shadow-sm'
-                      : 'text-ink-muted hover:text-ink-rich'
-                  }`}
+            {/* Sort By + Group By Row — Clean 12-column row on mobile */}
+            <div className="grid grid-cols-12 sm:flex items-center gap-1.5 sm:gap-2">
+              {/* Sort By Selector */}
+              <div className="col-span-5 sm:col-auto flex items-center gap-1 bg-surface-2 border border-surface-5/40 rounded-lg px-2 py-1 text-xs min-w-0">
+                <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 18V4" />
+                </svg>
+                <span className="text-[10px] font-bold text-ink-muted uppercase hidden sm:inline">Sort:</span>
+                <select
+                  value={filter === 'recently_added' ? 'recently_added' : sortBy}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSortBy(val);
+                    if (filter === 'recently_added' && val !== 'recently_added') {
+                      setFilter('all');
+                    }
+                    setPage(1);
+                  }}
+                  className="bg-transparent text-[10px] sm:text-xs font-bold text-ink-rich focus:outline-none cursor-pointer w-full sm:w-auto truncate"
+                  title="Sort gallery items"
                 >
-                  {g.label}
-                </button>
-              ))}
+                  <option value="alpha" className="bg-surface-2 text-ink-rich">A → Z</option>
+                  <option value="recently_added" className="bg-surface-2 text-ink-rich">Recently Added</option>
+                  <option value="last_scanned" className="bg-surface-2 text-ink-rich">Recently Scanned</option>
+                  <option value="year" className="bg-surface-2 text-ink-rich">Release Year</option>
+                </select>
+              </div>
+
+              {/* Group By Selector */}
+              <div className="col-span-7 sm:col-auto grid grid-cols-4 sm:flex items-center gap-0.5 bg-surface-2 border border-surface-5/40 rounded-lg p-0.5 text-xs min-w-0">
+                <span className="text-[10px] font-bold text-ink-muted uppercase px-1.5 hidden sm:inline">Group:</span>
+                {[
+                  { id: 'none', label: 'None', title: 'No Grouping — Show individual tracks' },
+                  { id: 'album', label: 'Album', title: 'Group tracks by Album' },
+                  { id: 'artist', label: 'Artist', title: 'Group tracks by Artist' },
+                  { id: 'folder', label: 'Folder', title: 'Group tracks by Folder' },
+                ].map(g => (
+                  <button
+                    key={g.id}
+                    onClick={() => { setGroupBy(g.id); setPage(1); }}
+                    title={g.title}
+                    className={`px-1 sm:px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold transition-all text-center truncate ${
+                      groupBy === g.id
+                        ? 'bg-amber-400 text-surface-0 shadow-sm'
+                        : 'text-ink-muted hover:text-ink-rich'
+                    }`}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Sync Existing Artwork Button (Folders + Embedded Audio Tags) */}
-            <button
-              onClick={handleSyncFolderArt}
-              disabled={syncingFolderArt}
-              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-surface-2 hover:bg-surface-3 border border-surface-5/40 hover:border-amber-400/50 text-ink-rich flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
-              title={selectedIds.size > 0 ? "Scan folders and embedded audio tags for selected tracks/albums to link existing artwork" : "Scan library folders (cover.jpg/folder.jpg) and embedded tags (FLAC/ID3) to capture existing artwork into database"}
-            >
-              <svg className={`w-3.5 h-3.5 text-amber-400 ${syncingFolderArt ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {syncingFolderArt ? (
-                  <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                ) : (
-                  <>
-                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-                    <line x1="12" y1="11" x2="12" y2="17"/>
-                    <line x1="9" y1="14" x2="15" y2="14"/>
-                  </>
-                )}
-              </svg>
-              <span>
-                {syncingFolderArt 
-                  ? 'Scanning Artwork...' 
-                  : selectedIds.size > 0 
-                  ? `Sync Existing Art (${selectedIds.size})` 
-                  : 'Sync Existing Art'}
-              </span>
-            </button>
+            {/* Action Buttons Row on Mobile (Sync Existing Art + Refresh + Select Page) */}
+            <div className="grid grid-cols-12 sm:flex items-center gap-1.5 sm:gap-2">
+              {/* Sync Existing Artwork Button (Folders + Embedded Audio Tags) */}
+              <button
+                onClick={handleSyncFolderArt}
+                disabled={syncingFolderArt}
+                className="col-span-5 sm:col-auto justify-center px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-bold bg-surface-2 hover:bg-surface-3 border border-surface-5/40 hover:border-amber-400/50 text-ink-rich flex items-center gap-1 sm:gap-1.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap min-w-0"
+                title={selectedIds.size > 0 ? "Scan folders and embedded audio tags for selected tracks/albums to link existing artwork" : "Scan library folders (cover.jpg/folder.jpg) and embedded tags (FLAC/ID3) to capture existing artwork into database"}
+              >
+                <svg className={`w-3.5 h-3.5 text-amber-400 shrink-0 ${syncingFolderArt ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  {syncingFolderArt ? (
+                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                  ) : (
+                    <>
+                      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                      <line x1="12" y1="11" x2="12" y2="17"/>
+                      <line x1="9" y1="14" x2="15" y2="14"/>
+                    </>
+                  )}
+                </svg>
+                <span className="truncate">
+                  {syncingFolderArt 
+                    ? 'Scanning...' 
+                    : selectedIds.size > 0 
+                    ? `Sync (${selectedIds.size})` 
+                    : (
+                      <>
+                        <span className="sm:hidden">Sync Art</span>
+                        <span className="hidden sm:inline">Sync Existing Art</span>
+                      </>
+                    )}
+                </span>
+              </button>
 
-            {/* In-Page Refresh Gallery Button */}
-            <button
-              onClick={() => {
-                const now = Date.now();
-                setCoverTimestamps(prev => {
-                  const next = { ...prev };
-                  tracks.forEach(t => { next[t.id] = now; });
-                  return next;
-                });
-                setGlobalTimestamp(now);
-                loadTracks();
-              }}
-              disabled={loading}
-              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-surface-2 hover:bg-surface-3 border border-surface-5/40 hover:border-amber-400/50 text-ink-rich flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
-              title="Refresh gallery and reload artwork"
-            >
-              <svg className={`w-3.5 h-3.5 text-amber-400 ${loading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-              </svg>
-              <span>Refresh</span>
-            </button>
+              {/* In-Page Refresh Gallery Button */}
+              <button
+                onClick={() => {
+                  const now = Date.now();
+                  setCoverTimestamps(prev => {
+                    const next = { ...prev };
+                    tracks.forEach(t => { next[t.id] = now; });
+                    return next;
+                  });
+                  setGlobalTimestamp(now);
+                  loadTracks();
+                }}
+                disabled={loading}
+                className="col-span-3 sm:col-auto px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-bold bg-surface-2 hover:bg-surface-3 border border-surface-5/40 hover:border-amber-400/50 text-ink-rich flex items-center justify-center gap-1 sm:gap-1.5 transition-all active:scale-95 disabled:opacity-50 min-w-0"
+                title="Refresh gallery and reload artwork"
+              >
+                <svg className={`w-3.5 h-3.5 text-amber-400 shrink-0 ${loading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
+                <span className="truncate">Refresh</span>
+              </button>
+
+              <button
+                onClick={isAllCurrentSelected ? clearSelection : selectAllCurrent}
+                className="col-span-4 sm:col-auto px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold bg-surface-2 hover:bg-surface-3 text-ink-normal border border-surface-5/40 transition-colors lg:hidden text-center truncate"
+              >
+                {isAllCurrentSelected ? 'Deselect Page' : 'Select Page'}
+              </button>
+            </div>
 
             {/* Review Banner when items have been updated in Missing Cover Art mode */}
             {filter === 'missing_cover' && (recentlyFixedGroupKeys.size > 0 || recentlyFixedTrackIds.size > 0) && (
@@ -993,127 +1025,140 @@ export default function AlbumArtGallery() {
                   setRecentlyFixedTrackIds(new Set());
                   loadTracks();
                 }}
-                className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 flex items-center gap-1.5 transition-all animate-fade-in shadow-xs"
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 flex items-center justify-center sm:justify-start gap-1.5 transition-all animate-fade-in shadow-xs"
                 title="Dismiss recently updated items and refresh missing list"
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="truncate">
                   {recentlyFixedGroupKeys.size > 0
                     ? `${recentlyFixedGroupKeys.size} ${recentlyFixedGroupKeys.size === 1 ? 'album' : 'albums'} updated`
                     : `${recentlyFixedTrackIds.size} ${recentlyFixedTrackIds.size === 1 ? 'track' : 'tracks'} updated`
                   } (reviewing)
                 </span>
-                <span className="font-bold underline text-emerald-300 ml-1">Remove from Missing →</span>
+                <span className="font-bold underline text-emerald-300 ml-1 shrink-0">Remove →</span>
               </button>
             )}
           </div>
 
           {/* Multi-Selection Actions */}
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-1.5 sm:gap-2 lg:ml-auto">
             <button
               onClick={isAllCurrentSelected ? clearSelection : selectAllCurrent}
-              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface-2 hover:bg-surface-3 text-ink-normal border border-surface-5/40 transition-colors"
+              className="hidden lg:inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface-2 hover:bg-surface-3 text-ink-normal border border-surface-5/40 transition-colors"
             >
               {isAllCurrentSelected ? 'Deselect Page' : 'Select Page'}
             </button>
 
             {selectedIds.size > 0 && (
-              <>
-                <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2 py-1 rounded border border-amber-400/20">
-                  {selectedIds.size} Selected
-                </span>
-
-                <button
-                  onClick={handleBatchSyncArt}
-                  disabled={syncingFolderArt || syncingGroupId}
-                  className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-white shadow-sm flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
-                  title="Sync artwork across tracks in all selected albums/groups"
-                >
-                  <svg className={`w-3.5 h-3.5 ${syncingFolderArt ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    {syncingFolderArt ? (
-                      <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                    ) : (
-                      <>
-                        <polyline points="23 4 23 10 17 10"/>
-                        <polyline points="1 20 1 14 7 14"/>
-                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                      </>
-                    )}
-                  </svg>
-                  <span>
-                    {syncingFolderArt 
-                      ? 'Syncing Art...' 
-                      : selectedGroups.length > 0 
-                      ? `Sync Art (${selectedGroups.length} ${selectedGroups.length === 1 ? 'Album' : 'Albums'})` 
-                      : `Sync Art (${selectedIds.size})`}
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-1.5 sm:gap-2 bg-amber-400/5 sm:bg-transparent p-2 sm:p-0 rounded-xl border border-amber-400/20 sm:border-0">
+                <div className="flex items-center justify-between sm:justify-start gap-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 sm:py-1 rounded border border-amber-400/20">
+                    {selectedIds.size} Selected
                   </span>
-                </button>
+                  <button
+                    onClick={clearSelection}
+                    className="sm:hidden text-[11px] font-bold text-ink-muted hover:text-ink-rich px-2 py-0.5"
+                    title="Clear selection"
+                  >
+                    Clear ✕
+                  </button>
+                </div>
 
-                <button
-                  onClick={handleBatchAiPull}
-                  className="px-3 py-1 rounded-lg text-xs font-bold bg-amber-400 hover:bg-amber-300 text-surface-0 shadow-sm flex items-center gap-1.5 transition-all active:scale-95"
-                  title="Search and pull official artwork for all selected tracks"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                  </svg>
-                  <span>Pull AI Covers ({selectedIds.size})</span>
-                </button>
+                <div className="grid grid-cols-4 sm:flex items-center gap-1 sm:gap-2">
+                  <button
+                    onClick={handleBatchSyncArt}
+                    disabled={syncingFolderArt || syncingGroupId}
+                    className="justify-center px-1.5 sm:px-3 py-1.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-white shadow-sm flex items-center gap-1 sm:gap-1.5 transition-all active:scale-95 disabled:opacity-50 min-w-0"
+                    title="Sync artwork across tracks in all selected albums/groups"
+                  >
+                    <svg className={`w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 ${syncingFolderArt ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      {syncingFolderArt ? (
+                        <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                      ) : (
+                        <>
+                          <polyline points="23 4 23 10 17 10"/>
+                          <polyline points="1 20 1 14 7 14"/>
+                          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </>
+                      )}
+                    </svg>
+                    <span className="truncate">
+                      {syncingFolderArt 
+                        ? 'Sync...' 
+                        : selectedGroups.length > 0 
+                        ? `Sync (${selectedGroups.length})` 
+                        : `Sync (${selectedIds.size})`}
+                    </span>
+                  </button>
 
-                <button
-                  onClick={handleBatchRemoveCover}
-                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1.5 transition-all"
-                  title="Remove embedded artwork from all selected tracks"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                  </svg>
-                  <span>Remove Art ({selectedIds.size})</span>
-                </button>
+                  <button
+                    onClick={handleBatchAiPull}
+                    className="justify-center px-1.5 sm:px-3 py-1.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-bold bg-amber-400 hover:bg-amber-300 text-surface-0 shadow-sm flex items-center gap-1 sm:gap-1.5 transition-all active:scale-95 min-w-0"
+                    title="Search and pull official artwork for all selected tracks"
+                  >
+                    <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    <span className="truncate">
+                      <span className="sm:hidden">AI ({selectedIds.size})</span>
+                      <span className="hidden sm:inline">Pull AI ({selectedIds.size})</span>
+                    </span>
+                  </button>
 
-                <button
-                  onClick={handleOpenSelectedInEditor}
-                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface-3 hover:bg-surface-4 text-ink-rich border border-surface-5/50 flex items-center gap-1.5 transition-all"
-                  title="Bulk edit selected tracks in editor modal"
-                >
-                  <svg className="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                    <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                  </svg>
-                  <span>Edit in Editor</span>
-                </button>
+                  <button
+                    onClick={handleBatchRemoveCover}
+                    className="justify-center px-1.5 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1 transition-all min-w-0"
+                    title="Remove embedded artwork from all selected tracks"
+                  >
+                    <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                    <span className="truncate">Remove</span>
+                  </button>
+
+                  <button
+                    onClick={handleOpenSelectedInEditor}
+                    className="justify-center px-1.5 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold bg-surface-3 hover:bg-surface-4 text-ink-rich border border-surface-5/50 flex items-center gap-1 transition-all min-w-0"
+                    title="Bulk edit selected tracks in editor modal"
+                  >
+                    <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                    <span className="truncate">Edit</span>
+                  </button>
+                </div>
 
                 <button
                   onClick={clearSelection}
-                  className="text-xs text-ink-muted hover:text-ink-rich p-1"
+                  className="hidden sm:inline-block text-xs text-ink-muted hover:text-ink-rich px-1.5 py-1"
                   title="Clear selection"
                 >
                   Clear
                 </button>
-              </>
+              </div>
             )}
           </div>
         </div>
 
         {/* Live Artwork Sync Progress Banner */}
         {coverSyncProgress && (
-          <div className="p-3.5 bg-surface-2/90 border border-amber-500/40 rounded-xl shadow-lg flex flex-col gap-2 animate-fade-in">
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 overflow-hidden">
+          <div className="p-3 sm:p-3.5 bg-surface-2/90 border border-amber-500/40 rounded-xl shadow-lg flex flex-col gap-2 animate-fade-in">
+            <div className="flex flex-wrap items-center justify-between gap-1.5 text-xs">
+              <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
-                <span className="font-bold text-amber-400 shrink-0">Scanning Library Artwork</span>
+                <span className="font-bold text-amber-400 shrink-0">Scanning Art</span>
                 <span className="text-ink-muted shrink-0">·</span>
                 <span className="text-ink-normal truncate font-mono text-[11px]">
                   {coverSyncProgress.filename || coverSyncProgress.status || 'Inspecting files...'}
                 </span>
               </div>
-              <div className="flex items-center gap-2.5 font-mono shrink-0 ml-2">
-                <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  {coverSyncProgress.found || 0} covers found
+              <div className="flex items-center gap-2 font-mono shrink-0 text-[11px]">
+                <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  {coverSyncProgress.found || 0} found
                 </span>
-                <span className="text-ink-muted">|</span>
                 <span className="text-ink-rich font-bold">
-                  {coverSyncProgress.current} / {coverSyncProgress.total} ({coverSyncProgress.total > 0 ? Math.round((coverSyncProgress.current / coverSyncProgress.total) * 100) : 0}%)
+                  {coverSyncProgress.current}/{coverSyncProgress.total} ({coverSyncProgress.total > 0 ? Math.round((coverSyncProgress.current / coverSyncProgress.total) * 100) : 0}%)
                 </span>
               </div>
             </div>
@@ -1141,7 +1186,7 @@ export default function AlbumArtGallery() {
       </div>
 
       {/* Main Grid View */}
-      <div className="bg-surface-1/40 border border-surface-5/30 rounded-2xl p-4 sm:p-6 shadow-sm min-h-[300px]">
+      <div className="bg-surface-1/40 border border-surface-5/30 rounded-2xl p-2.5 sm:p-6 shadow-sm min-h-[300px]">
         {loading ? (
           <div className="h-64 flex flex-col items-center justify-center gap-3 text-ink-muted">
             <svg className="w-8 h-8 text-amber-400 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1164,7 +1209,7 @@ export default function AlbumArtGallery() {
         ) : groupBy !== 'none' && filteredGroups ? (
           /* ── Grouped View (e.g. Group by Album, Artist, or Folder) ── */
           <div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2.5 sm:gap-4">
               {filteredGroups.map(group => {
                 const repTrack = group.representative_track || group.representativeTrack || (group.tracks && group.tracks[0]) || {};
                 const previewTrack = (hoveredTrack?.groupKey === group.key) ? hoveredTrack.track : null;
@@ -1189,7 +1234,7 @@ export default function AlbumArtGallery() {
                         setHoveredTrack(null);
                       }
                     }}
-                    className={`group relative bg-surface-1 rounded-2xl border transition-all duration-200 flex flex-col overflow-hidden hover:shadow-lg ${
+                    className={`group relative bg-surface-1 rounded-xl sm:rounded-2xl border transition-all duration-200 flex flex-col overflow-hidden hover:shadow-lg ${
                       isGroupAllSelected
                         ? 'border-amber-400 ring-2 ring-amber-400/30 bg-surface-2'
                         : isGroupPartiallySelected
@@ -1232,7 +1277,7 @@ export default function AlbumArtGallery() {
                                   <polyline points="1 20 1 14 7 14"/>
                                   <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
                                 </svg>
-                                <span>{syncingGroupId === group.key ? 'Syncing...' : 'Sync to Album'}</span>
+                                <span>{syncingGroupId === group.key ? 'Syncing...' : 'Sync'}</span>
                               </button>
                             ) : (
                               <span className="text-[8px] font-bold px-1.5 py-0.5 rounded font-mono shrink-0 uppercase bg-red-500/90 text-white">
@@ -1246,7 +1291,7 @@ export default function AlbumArtGallery() {
                       {/* Group Checkbox */}
                       <div
                         onClick={(e) => toggleSelectGroup(group, e)}
-                        className={`absolute top-2 left-2 w-5 h-5 rounded-md border transition-all flex items-center justify-center z-10 cursor-pointer ${
+                        className={`absolute top-1.5 sm:top-2 left-1.5 sm:left-2 w-5 h-5 rounded-md border transition-all flex items-center justify-center z-10 cursor-pointer ${
                           isGroupAllSelected
                             ? 'bg-amber-400 border-amber-400 text-surface-0 shadow-sm'
                             : isGroupPartiallySelected
@@ -1265,14 +1310,14 @@ export default function AlbumArtGallery() {
                       </div>
 
                       {/* Status Badge */}
-                      <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+                      <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 flex items-center gap-1 z-10 max-w-[calc(100%-2.25rem)]">
                         {recentlyFixedGroupKeys.has(group.key) && anyHaveCover ? (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm backdrop-blur-xs uppercase font-mono bg-emerald-500 text-white ring-2 ring-emerald-400/60 flex items-center gap-1">
-                            <svg className="w-2.5 h-2.5 stroke-[3]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Cover Added ({trackCount})</span>
+                          <span className="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm backdrop-blur-xs uppercase font-mono bg-emerald-500 text-white ring-2 ring-emerald-400/60 flex items-center gap-1 truncate">
+                            <svg className="w-2.5 h-2.5 stroke-[3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+                            <span className="truncate">Added ({trackCount})</span>
                           </span>
                         ) : (
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm backdrop-blur-xs uppercase font-mono transition-colors ${
+                          <span className={`text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm backdrop-blur-xs uppercase font-mono transition-colors truncate ${
                             allHaveCover
                               ? 'bg-emerald-500/90 text-white'
                               : anyHaveCover
@@ -1282,7 +1327,7 @@ export default function AlbumArtGallery() {
                             {allHaveCover
                               ? `Cover (${trackCount})`
                               : anyHaveCover
-                              ? `Partial (${hasCoverCount}/${trackCount})`
+                              ? `Part (${hasCoverCount}/${trackCount})`
                               : `No Art (${trackCount})`
                             }
                           </span>
@@ -1290,17 +1335,21 @@ export default function AlbumArtGallery() {
                       </div>
 
                       {/* Quick Action Overlay (AI Pull Album + Edit + Sync Art) */}
-                      <div className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5 pt-8 bg-gradient-to-t from-black/95 via-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center gap-1.5 z-10">
+                      <div className={`absolute inset-x-0 bottom-0 px-1.5 sm:px-2 pb-1.5 sm:pb-2 pt-5 sm:pt-8 bg-gradient-to-t from-black/95 via-black/70 to-transparent transition-all duration-200 flex items-center justify-center gap-1 z-10 ${
+                        viewport.isTouch || viewport.isCompact
+                          ? 'opacity-100'
+                          : 'opacity-0 group-hover:opacity-100'
+                      }`}>
                         <button
                           type="button"
                           onClick={(e) => handleOpenGroupInEditor(group, e)}
-                          className="flex-1 min-w-0 h-7.5 px-1.5 rounded-lg bg-surface-1/90 hover:bg-surface-1 text-ink-rich hover:text-amber-400 text-[10px] font-bold border border-surface-5/60 shadow-md inline-flex items-center justify-center gap-1.5 transition-all active:scale-95 whitespace-nowrap overflow-hidden"
+                          className="flex-1 min-w-0 h-6 sm:h-7 px-1 sm:px-1.5 rounded-md sm:rounded-lg bg-surface-1/90 hover:bg-surface-1 text-ink-rich hover:text-amber-400 text-[9px] sm:text-[10px] font-bold border border-surface-5/60 shadow-md inline-flex items-center justify-center gap-1 transition-all active:scale-95 whitespace-nowrap overflow-hidden"
                           title="Open all tracks in editor"
                         >
-                          <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                           </svg>
-                          <span className="leading-none">Edit</span>
+                          <span className="leading-none truncate">Edit</span>
                         </button>
 
                         {anyHaveCover && (
@@ -1308,10 +1357,10 @@ export default function AlbumArtGallery() {
                             type="button"
                             onClick={(e) => handleSyncGroupArt(group, null, e)}
                             disabled={syncingGroupId === group.key}
-                            className="flex-1 min-w-0 h-7.5 px-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-[10px] font-bold shadow-md shadow-emerald-500/20 inline-flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap overflow-hidden"
+                            className="flex-1 min-w-0 h-6 sm:h-7 px-1 sm:px-1.5 rounded-md sm:rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-[9px] sm:text-[10px] font-bold shadow-md shadow-emerald-500/20 inline-flex items-center justify-center gap-1 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap overflow-hidden"
                             title="Sync artwork across all tracks in this group"
                           >
-                            <svg className={`w-3.5 h-3.5 shrink-0 ${syncingGroupId === group.key ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg className={`w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0 ${syncingGroupId === group.key ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               {syncingGroupId === group.key ? (
                                 <path d="M21 12a9 9 0 11-6.219-8.56"/>
                               ) : (
@@ -1322,38 +1371,38 @@ export default function AlbumArtGallery() {
                                 </>
                               )}
                             </svg>
-                            <span className="leading-none">{syncingGroupId === group.key ? 'Syncing…' : 'Sync'}</span>
+                            <span className="leading-none truncate">{syncingGroupId === group.key ? '…' : 'Sync'}</span>
                           </button>
                         )}
 
                         <button
                           type="button"
                           onClick={(e) => handleGroupAiPull(group, e)}
-                          className="flex-1 min-w-0 h-7.5 px-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-surface-0 text-[10px] font-bold shadow-md shadow-amber-400/20 inline-flex items-center justify-center gap-1.5 transition-all active:scale-95 whitespace-nowrap overflow-hidden"
+                          className="flex-1 min-w-0 h-6 sm:h-7 px-1 sm:px-1.5 rounded-md sm:rounded-lg bg-amber-400 hover:bg-amber-300 text-surface-0 text-[9px] sm:text-[10px] font-bold shadow-md shadow-amber-400/20 inline-flex items-center justify-center gap-1 transition-all active:scale-95 whitespace-nowrap overflow-hidden"
                           title="Pull official cover once for all tracks in this album"
                         >
-                          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                           </svg>
-                          <span className="leading-none">{anyHaveCover ? 'AI' : 'AI Pull'}</span>
+                          <span className="leading-none truncate">{anyHaveCover || viewport.isCompact ? 'AI' : 'AI Pull'}</span>
                         </button>
                       </div>
                     </div>
 
                     {/* Group Details */}
-                    <div className="p-2.5 flex-1 flex flex-col justify-between">
-                      <div>
-                        <h4 className="text-xs font-bold text-ink-rich truncate" title={group.title}>
+                    <div className="p-2 sm:p-2.5 flex-1 flex flex-col justify-between min-w-0">
+                      <div className="min-w-0">
+                        <h4 className="text-[11px] sm:text-xs font-bold text-ink-rich truncate" title={group.title}>
                           {group.title}
                         </h4>
-                        <p className="text-[11px] text-ink-normal truncate mt-0.5" title={group.subtitle}>
+                        <p className="text-[10px] sm:text-[11px] text-ink-normal truncate mt-0.5" title={group.subtitle}>
                           {group.subtitle || '—'}
                         </p>
                       </div>
 
                       {/* Quick Track Hover Strip (Zero eager image requests on load! Lightweight pills) */}
                       {!isExpanded && group.tracks && group.tracks.length > 1 && (
-                        <div className="mt-2 pt-1.5 border-t border-surface-5/20 flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5" title="Hover over any track number to preview its artwork or sync to album">
+                        <div className="mt-1.5 sm:mt-2 pt-1.5 border-t border-surface-5/20 flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5" title="Hover over any track number to preview its artwork or sync to album">
                           {group.tracks.slice(0, 10).map((t, idx) => {
                             const isPillHovered = previewTrack?.id === t.id;
                             const isSyncTarget = isPillHovered && t.has_cover;
@@ -1414,20 +1463,20 @@ export default function AlbumArtGallery() {
                       )}
 
                       {/* Expand / Collapse Tracks Toggle */}
-                      <div className="mt-2 pt-2 border-t border-surface-5/30 flex items-center justify-between text-[10px]">
-                        <span className="text-ink-muted font-medium">
+                      <div className="mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-surface-5/30 flex items-center justify-between gap-1 text-[9px] sm:text-[10px]">
+                        <span className="text-ink-muted font-medium truncate">
                           {filter === 'missing_cover' && (group.missing_cover_count !== undefined ? group.missing_cover_count : (trackCount - hasCoverCount)) > 0
-                            ? `${group.missing_cover_count !== undefined ? group.missing_cover_count : (trackCount - hasCoverCount)} missing of ${trackCount}`
+                            ? `${group.missing_cover_count !== undefined ? group.missing_cover_count : (trackCount - hasCoverCount)}/${trackCount} miss`
                             : `${trackCount} ${trackCount === 1 ? 'track' : 'tracks'}`
                           }
                         </span>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 shrink-0">
                           {anyHaveCover && isExpanded && (
                             <button
                               type="button"
                               onClick={(e) => handleSyncGroupArt(group, null, e)}
                               disabled={syncingGroupId === group.key}
-                              className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 text-[10px] bg-emerald-500/10 hover:bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/20 transition-all active:scale-95 disabled:opacity-50"
+                              className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-0.5 text-[9px] sm:text-[10px] bg-emerald-500/10 hover:bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/20 transition-all active:scale-95 disabled:opacity-50"
                               title="Sync artwork across all tracks in this album"
                             >
                               <svg className={`w-2.5 h-2.5 ${syncingGroupId === group.key ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1435,7 +1484,7 @@ export default function AlbumArtGallery() {
                                 <polyline points="1 20 1 14 7 14"/>
                                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
                               </svg>
-                              <span>{syncingGroupId === group.key ? 'Syncing...' : 'Sync All'}</span>
+                              <span>{syncingGroupId === group.key ? '…' : 'Sync'}</span>
                             </button>
                           )}
                           <button
@@ -1502,7 +1551,7 @@ export default function AlbumArtGallery() {
                                       type="button"
                                       onClick={(e) => handleSyncGroupArt(group, t, e)}
                                       disabled={syncingGroupId === group.key}
-                                      className="opacity-0 group-hover/track:opacity-100 p-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 transition-opacity"
+                                      className="opacity-100 sm:opacity-0 sm:group-hover/track:opacity-100 p-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 transition-opacity"
                                       title="Sync this track's cover to all tracks in album"
                                     >
                                       <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1513,14 +1562,14 @@ export default function AlbumArtGallery() {
                                     </button>
                                   )}
                                   <span
-                                    className="opacity-0 group-hover/track:opacity-100 p-0.5 text-ink-muted hover:text-amber-400 transition-opacity"
+                                    className="opacity-100 sm:opacity-0 sm:group-hover/track:opacity-100 p-0.5 text-ink-muted hover:text-amber-400 transition-opacity"
                                     title="Edit track in Universal Tag Editor"
                                   >
                                     <svg className="w-3 h-3 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                                       <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                                     </svg>
                                   </span>
-                                  <span className="text-ink-muted font-mono uppercase text-[9px]">{t.format}</span>
+                                  <span className="text-ink-muted font-mono uppercase text-[9px] hidden sm:inline">{t.format}</span>
                                 </div>
                               </div>
                             );
@@ -1536,7 +1585,7 @@ export default function AlbumArtGallery() {
         ) : (
           /* ── Flat Individual Tracks View ── */
           <div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2.5 sm:gap-4">
               {visibleTracks.map(track => {
                 const isSelected = selectedIds.has(track.id);
                 const isAiLoading = aiLoadingIds[track.id];
@@ -1567,10 +1616,12 @@ export default function AlbumArtGallery() {
                       {/* Multi-Select Checkbox */}
                       <div 
                         onClick={(e) => toggleSelect(track.id, e)}
-                        className={`absolute top-2 left-2 w-5 h-5 rounded-md border transition-all flex items-center justify-center z-10 ${
+                        className={`absolute top-1.5 sm:top-2 left-1.5 sm:left-2 w-5 h-5 rounded-md border transition-all flex items-center justify-center z-10 ${
                           isSelected 
                             ? 'bg-amber-400 border-amber-400 text-surface-0 shadow-sm' 
-                            : 'bg-black/50 backdrop-blur-xs border-white/40 text-transparent hover:border-white/80 opacity-0 group-hover:opacity-100'
+                            : `bg-black/50 backdrop-blur-xs border-white/40 text-transparent hover:border-white/80 ${
+                                viewport.isTouch || viewport.isCompact ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                              }`
                         }`}
                       >
                         <svg className="w-3.5 h-3.5 stroke-[3]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -1579,14 +1630,14 @@ export default function AlbumArtGallery() {
                       </div>
 
                       {/* Format / Status Badge */}
-                      <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+                      <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 flex items-center gap-1 z-10 max-w-[calc(100%-2.25rem)]">
                         {recentlyFixedTrackIds.has(track.id) && hasCover ? (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm backdrop-blur-xs uppercase font-mono bg-emerald-500 text-white ring-2 ring-emerald-400/60 flex items-center gap-1">
-                            <svg className="w-2.5 h-2.5 stroke-[3]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Cover Added</span>
+                          <span className="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm backdrop-blur-xs uppercase font-mono bg-emerald-500 text-white ring-2 ring-emerald-400/60 flex items-center gap-1 truncate">
+                            <svg className="w-2.5 h-2.5 stroke-[3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+                            <span className="truncate">Added</span>
                           </span>
                         ) : (
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm backdrop-blur-xs uppercase font-mono transition-colors ${
+                          <span className={`text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm backdrop-blur-xs uppercase font-mono transition-colors truncate ${
                             hasCover 
                               ? 'bg-emerald-500/85 text-white' 
                               : 'bg-black/60 text-ink-muted border border-surface-5/50'
@@ -1607,46 +1658,50 @@ export default function AlbumArtGallery() {
                       )}
 
                       {/* Hover Quick Action Buttons Overlay */}
-                      <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between gap-1 z-10">
+                      <div className={`absolute inset-x-0 bottom-0 p-1.5 sm:p-2 bg-gradient-to-t from-black/80 via-black/50 to-transparent transition-opacity flex items-center justify-between gap-1 z-10 ${
+                        viewport.isTouch || viewport.isCompact
+                          ? 'opacity-100'
+                          : 'opacity-0 group-hover:opacity-100'
+                      }`}>
                         <button
                           type="button"
                           onClick={(e) => handleOpenTrackEditor(track, e)}
-                          className="px-2 py-1 rounded bg-surface-1/90 hover:bg-surface-1 text-ink-rich hover:text-amber-400 text-[10px] font-bold border border-surface-5/50 shadow-sm flex items-center gap-1 transition-all"
+                          className="flex-1 min-w-0 h-6 sm:h-7 justify-center px-1.5 sm:px-2 rounded-md bg-surface-1/90 hover:bg-surface-1 text-ink-rich hover:text-amber-400 text-[9px] sm:text-[10px] font-bold border border-surface-5/50 shadow-sm flex items-center gap-1 transition-all truncate"
                           title="Open track in editor window"
                         >
-                          <svg className="w-3 h-3 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                           </svg>
-                          <span>Editor</span>
+                          <span className="truncate">Edit</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={(e) => handleSingleAiPull(track, e)}
                           disabled={isAiLoading}
-                          className="px-2 py-1 rounded bg-amber-400 hover:bg-amber-300 text-surface-0 text-[10px] font-bold shadow-sm flex items-center gap-1 transition-all disabled:opacity-50"
+                          className="flex-1 min-w-0 h-6 sm:h-7 justify-center px-1.5 sm:px-2 rounded-md bg-amber-400 hover:bg-amber-300 text-surface-0 text-[9px] sm:text-[10px] font-bold shadow-sm flex items-center gap-1 transition-all disabled:opacity-50 truncate"
                           title="Pull official cover from Google AI"
                         >
-                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                           </svg>
-                          <span>AI Pull</span>
+                          <span className="truncate">{viewport.isCompact ? 'AI' : 'AI Pull'}</span>
                         </button>
                       </div>
                     </div>
 
                     {/* Text Details */}
-                    <div className="p-2.5 flex-1 flex flex-col justify-between">
-                      <div>
-                        <h4 className="text-xs font-bold text-ink-rich truncate" title={track.title || track.filename}>
+                    <div className="p-2 sm:p-2.5 flex-1 flex flex-col justify-between min-w-0">
+                      <div className="min-w-0">
+                        <h4 className="text-[11px] sm:text-xs font-bold text-ink-rich truncate" title={track.title || track.filename}>
                           {track.title || track.filename}
                         </h4>
-                        <p className="text-[11px] text-ink-normal truncate" title={track.artist || 'Unknown Artist'}>
+                        <p className="text-[10px] sm:text-[11px] text-ink-normal truncate" title={track.artist || 'Unknown Artist'}>
                           {track.artist || 'Unknown Artist'}
                         </p>
                       </div>
-                      <div className="mt-1 flex items-center justify-between text-[10px] text-ink-muted">
-                        <span className="truncate max-w-[70%]" title={track.album || ''}>
+                      <div className="mt-1 flex items-center justify-between gap-1 text-[9px] sm:text-[10px] text-ink-muted">
+                        <span className="truncate" title={track.album || ''}>
                           {track.album || '—'}
                         </span>
                         <span className="font-mono uppercase text-[9px] opacity-75 shrink-0">
@@ -1662,104 +1717,140 @@ export default function AlbumArtGallery() {
         )}
 
         {/* Bottom Pagination Bar directly after the tiles */}
-            <div className="mt-6 pt-4 border-t border-surface-5/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-muted">
-              <div className="flex items-center gap-2">
-                {groupBy !== 'none' ? (
-                  <>
-                    <span className="font-bold text-ink-rich">
-                      {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalGroups)}
-                    </span>
-                    <span>of</span>
-                    <span className="font-bold text-amber-400">{totalGroups.toLocaleString()} {groupBy === 'folder' ? 'folders' : `${groupBy}s`}</span>
-                    <span className="text-surface-5">•</span>
-                    <span>({totalTracksCount.toLocaleString()} ${filter === 'missing_cover' ? 'missing tracks' : 'tracks'})</span>
-                    <span className="text-surface-5">•</span>
-                    <span>Page {page} of {totalPages}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="font-bold text-ink-rich">
-                      {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}
-                    </span>
-                    <span>of</span>
-                    <span className="font-bold text-amber-400">{total.toLocaleString()} tracks</span>
-                    <span className="text-surface-5">•</span>
-                    <span>Page {page} of {totalPages}</span>
-                  </>
-                )}
-              </div>
+        <div className="mt-5 sm:mt-6 pt-3.5 sm:pt-4 border-t border-surface-5/40 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 text-[11px] sm:text-xs text-ink-muted">
+          {/* Row 1 on Mobile: Summary Count + Per Page + Go To */}
+          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2">
+            <div className="flex items-center gap-1.5">
+              {groupBy !== 'none' ? (
+                <>
+                  <span className="font-bold text-ink-rich">
+                    {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalGroups)}
+                  </span>
+                  <span>of</span>
+                  <span className="font-bold text-amber-400">{totalGroups.toLocaleString()} {groupBy === 'folder' ? 'folders' : `${groupBy}s`}</span>
+                  <span className="hidden sm:inline text-surface-5">•</span>
+                  <span className="hidden sm:inline">({totalTracksCount.toLocaleString()} {filter === 'missing_cover' ? 'missing tracks' : 'tracks'})</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-bold text-ink-rich">
+                    {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}
+                  </span>
+                  <span>of</span>
+                  <span className="font-bold text-amber-400">{total.toLocaleString()} tracks</span>
+                </>
+              )}
+            </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Per Page Selector */}
-                <label className="flex items-center gap-1.5 text-xs text-ink-muted">
-                  <span>Per page:</span>
-                  <select
-                    value={pageSize}
-                    onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                    className="bg-surface-2 border border-surface-5/50 rounded px-2 py-1 text-xs text-ink-rich outline-none font-semibold"
-                  >
-                    <option value="24">24</option>
-                    <option value="48">48</option>
-                    <option value="96">96</option>
-                    <option value="192">192</option>
-                  </select>
-                </label>
-
-                {/* Quick Page Jump */}
-                <div className="flex items-center gap-1.5 text-xs text-ink-muted">
-                  <span>Go to:</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max={totalPages}
-                    value={page}
-                    onChange={e => {
-                      const val = parseInt(e.target.value, 10);
-                      if (!isNaN(val) && val >= 1 && val <= totalPages) {
-                        setPage(val);
-                      }
-                    }}
-                    className="w-14 bg-surface-2 border border-surface-5/50 rounded px-2 py-1 text-xs text-ink-rich text-center outline-none font-bold"
-                  />
-                </div>
-
-                {/* Navigation Buttons */}
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setPage(1)}
-                    disabled={page <= 1}
-                    className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter"
-                  >
-                    First
-                  </button>
-                  <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page <= 1}
-                    className="p-1 px-3 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted"
-                  >
-                    ← Prev
-                  </button>
-                  <div className="px-3.5 py-1 rounded-lg bg-surface-3 border border-surface-4 text-xs font-black text-amber-500 tabular-nums">
-                    {page} / {totalPages}
-                  </div>
-                  <button
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
-                    className="p-1 px-3 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted"
-                  >
-                    Next →
-                  </button>
-                  <button
-                    onClick={() => setPage(totalPages)}
-                    disabled={page >= totalPages}
-                    className="p-1 px-2.5 rounded-lg border border-surface-4 hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter"
-                  >
-                    Last
-                  </button>
-                </div>
+            {/* Mobile Per Page + Go To inline right */}
+            <div className="flex sm:hidden items-center gap-2">
+              <label className="flex items-center gap-1 text-[10px] text-ink-muted">
+                <span>Show:</span>
+                <select
+                  value={pageSize}
+                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  className="bg-surface-2 border border-surface-5/50 rounded px-1.5 py-0.5 text-[11px] text-ink-rich outline-none font-semibold"
+                >
+                  <option value="24">24</option>
+                  <option value="48">48</option>
+                  <option value="96">96</option>
+                  <option value="192">192</option>
+                </select>
+              </label>
+              <div className="flex items-center gap-1 text-[10px] text-ink-muted">
+                <span>Page:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={totalPages}
+                  value={page}
+                  onChange={e => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                      setPage(val);
+                    }
+                  }}
+                  className="w-10 bg-surface-2 border border-surface-5/50 rounded px-1 py-0.5 text-[11px] text-ink-rich text-center outline-none font-bold"
+                />
               </div>
             </div>
           </div>
+
+          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto">
+            {/* Desktop Per Page Selector */}
+            <label className="hidden sm:flex items-center gap-1.5 text-xs text-ink-muted">
+              <span>Per page:</span>
+              <select
+                value={pageSize}
+                onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                className="bg-surface-2 border border-surface-5/50 rounded px-2 py-1 text-xs text-ink-rich outline-none font-semibold"
+              >
+                <option value="24">24</option>
+                <option value="48">48</option>
+                <option value="96">96</option>
+                <option value="192">192</option>
+              </select>
+            </label>
+
+            {/* Desktop Quick Page Jump */}
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-ink-muted">
+              <span>Go to:</span>
+              <input
+                type="number"
+                min="1"
+                max={totalPages}
+                value={page}
+                onChange={e => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                    setPage(val);
+                  }
+                }}
+                className="w-14 bg-surface-2 border border-surface-5/50 rounded px-2 py-1 text-xs text-ink-rich text-center outline-none font-bold"
+              />
+            </div>
+
+            {/* Navigation Buttons (Full-width symmetrical bar on mobile) */}
+            <div className="grid grid-cols-5 sm:flex items-center gap-1 sm:gap-1.5 w-full sm:w-auto">
+              <button
+                onClick={() => setPage(1)}
+                disabled={page <= 1}
+                className="p-1.5 sm:p-1 sm:px-2.5 rounded-lg border border-surface-4 bg-surface-2 sm:bg-transparent hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter text-center"
+              >
+                <span className="hidden sm:inline">First</span>
+                <span className="sm:hidden">«</span>
+              </button>
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="p-1.5 sm:p-1 sm:px-3 rounded-lg border border-surface-4 bg-surface-2 sm:bg-transparent hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted text-center"
+              >
+                <span className="hidden sm:inline">← Prev</span>
+                <span className="sm:hidden">‹</span>
+              </button>
+              <div className="px-1 sm:px-3.5 py-1.5 sm:py-1 rounded-lg bg-surface-3 border border-surface-4 text-[11px] sm:text-xs font-black text-amber-500 tabular-nums whitespace-nowrap text-center">
+                {page} / {totalPages}
+              </div>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="p-1.5 sm:p-1 sm:px-3 rounded-lg border border-surface-4 bg-surface-2 sm:bg-transparent hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-muted text-center"
+              >
+                <span className="hidden sm:inline">Next →</span>
+                <span className="sm:hidden">›</span>
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={page >= totalPages}
+                className="p-1.5 sm:p-1 sm:px-2.5 rounded-lg border border-surface-4 bg-surface-2 sm:bg-transparent hover:border-amber-500/30 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-faint uppercase tracking-tighter text-center"
+              >
+                <span className="hidden sm:inline">Last</span>
+                <span className="sm:hidden">»</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Batch Google AI Progress Modal */}
       {batchModalOpen && batchProgress && (

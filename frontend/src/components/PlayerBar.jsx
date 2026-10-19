@@ -36,10 +36,18 @@ export default function PlayerBar() {
     setRepeatMode(nextMode);
   };
 
+  const getClientX = (e) => {
+    if (e.touches && e.touches.length > 0) return e.touches[0].clientX;
+    if (e.changedTouches && e.changedTouches.length > 0) return e.changedTouches[0].clientX;
+    return e.clientX;
+  };
+
   const handleScrub = (e) => {
     if (!duration || !scrubberRef.current) return;
+    const clientX = getClientX(e);
+    if (typeof clientX !== 'number') return;
     const rect = scrubberRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
     setDragProgress(x / rect.width);
   };
 
@@ -49,20 +57,31 @@ export default function PlayerBar() {
     handleScrub(e);
   };
 
+  const onTouchStart = (e) => {
+    if (!duration) return;
+    setIsDragging(true);
+    handleScrub(e);
+  };
+
   React.useEffect(() => {
     if (!isDragging) return;
 
     const onMouseMove = (e) => handleScrub(e);
-    const onMouseUp = () => {
+    const onTouchMove = (e) => handleScrub(e);
+    const onEnd = () => {
       seek(dragProgress * duration);
       setIsDragging(false);
     };
 
     window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onEnd);
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onEnd);
     };
   }, [isDragging, dragProgress, duration, seek]);
 
@@ -70,12 +89,13 @@ export default function PlayerBar() {
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-surface-5/30 bg-surface-1/95 backdrop-blur-lg w-full max-w-full overflow-hidden">
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-surface-5/30 bg-surface-1/95 backdrop-blur-lg w-full max-w-full overflow-hidden safe-pb">
         {/* Scrubber - Large Hit Area */}
         <div
           ref={scrubberRef}
-          className="h-4 -mt-2 relative z-10 cursor-pointer group flex items-center"
+          className="h-5 sm:h-4 -mt-2 relative z-10 cursor-pointer group flex items-center touch-none"
           onMouseDown={onMouseDown}
+          onTouchStart={onTouchStart}
         >
           {/* Background Track */}
           <div className="absolute inset-x-0 h-[3px] group-hover:h-1 bg-surface-4 transition-all duration-150" />
@@ -88,14 +108,12 @@ export default function PlayerBar() {
           
           {/* Thumb/Knob */}
           <div
-            className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-300 shadow-xl border-2 border-amber-500/30 ${isDragging ? '' : 'transition-all duration-200'} ${isDragging ? 'scale-125 opacity-100' : 'opacity-0 group-hover:opacity-100 group-hover:scale-110'}`}
+            className={`absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-3 sm:h-3 rounded-full bg-amber-300 shadow-xl border-2 border-amber-500/30 ${isDragging ? '' : 'transition-all duration-200'} ${isDragging ? 'scale-125 opacity-100' : 'opacity-0 group-hover:opacity-100 group-hover:scale-110'}`}
             style={{ left: `${displayPct}%`, marginLeft: '-6px' }}
           />
-          
-          {/* Hover Time Indicator (Optional but nice) */}
         </div>
 
-        <div className="max-w-[1600px] mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="max-w-[1600px] mx-auto px-2.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-1.5 sm:gap-4">
           {/* Track info - Clickable for details */}
           <div 
             className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0 cursor-pointer group/info"
@@ -225,8 +243,8 @@ export default function PlayerBar() {
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-2 sm:gap-3.5 flex-1 justify-end shrink-0">
-            <span className="text-[10px] sm:text-[11px] text-ink-normal font-mono min-w-[60px] text-right tabular-nums hidden xs:inline">
+          <div className="flex items-center gap-1 sm:gap-3.5 sm:flex-1 justify-end shrink-0">
+            <span className="text-[10px] sm:text-[11px] text-ink-normal font-mono min-w-[60px] text-right tabular-nums hidden sm:inline">
               {fmt(currentTime)} / {fmt(duration)}
             </span>
 

@@ -589,20 +589,20 @@ export default function SettingsPanel({ visible = true }) {
       {/* Main Layout: Sidebar + Content Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Navigation Sidebar */}
-        <aside className="lg:col-span-3 studio-card p-2 bg-surface-1 border-surface-4 flex lg:flex-col gap-1 overflow-x-auto scrollbar-none">
+        <aside className="lg:col-span-3 studio-card p-1.5 sm:p-2 bg-surface-1 border-surface-4 flex lg:flex-col gap-1 overflow-x-auto no-scrollbar max-w-full">
           {SECTIONS.map((sec) => {
             const isActive = activeTab === sec.id;
             return (
               <button
                 key={sec.id}
                 onClick={() => setActiveTab(sec.id)}
-                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition-all shrink-0 lg:w-full ${
+                className={`flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3.5 py-2 sm:py-3 rounded-xl text-left transition-all shrink-0 lg:w-full ${
                   isActive
                     ? 'bg-amber-400/15 text-amber-400 border border-amber-400/30 shadow-sm'
                     : 'text-ink-muted hover:text-ink-rich hover:bg-surface-2 border border-transparent'
                 }`}
               >
-                <div className={`p-2 rounded-lg shrink-0 ${isActive ? 'bg-amber-400 text-surface-0' : 'bg-surface-2 text-ink-faint'}`}>
+                <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${isActive ? 'bg-amber-400 text-surface-0' : 'bg-surface-2 text-ink-faint'}`}>
                   {sec.icon}
                 </div>
                 <div className="min-w-0">
@@ -629,7 +629,7 @@ export default function SettingsPanel({ visible = true }) {
         </aside>
 
         {/* Right Content Area */}
-        <div className="lg:col-span-9 studio-card p-5 sm:p-6 bg-surface-1 border-surface-4 min-h-[520px]">
+        <div className="lg:col-span-9 studio-card p-3.5 sm:p-6 bg-surface-1 border-surface-4 min-h-[420px] sm:min-h-[520px]">
           {/* TAB 1: LIBRARY & AUTO-SCAN */}
           {activeTab === 'sources' && (
             <div className="space-y-8 animate-scale-in">
@@ -937,7 +937,7 @@ export default function SettingsPanel({ visible = true }) {
                     </span>
                   </div>
                   {dbStats && (
-                    <span className="px-3 py-1 rounded-lg bg-surface-2 border border-surface-4 text-xs font-mono text-ink-normal">
+                    <span className="px-3 py-1 rounded-lg bg-surface-2 border border-surface-4 text-xs font-mono text-ink-normal break-all">
                       {dbStats.db_path} ({dbStats.db_size_mb} MB)
                     </span>
                   )}
@@ -1228,7 +1228,7 @@ export default function SettingsPanel({ visible = true }) {
           {activeTab === 'providers' && (
             <div className="space-y-6 animate-scale-in">
               {quota && quota.provider_name && (
-                <div className="p-4 rounded-xl bg-surface-2 border border-surface-4 flex items-center justify-between">
+                <div className="p-4 rounded-xl bg-surface-2 border border-surface-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-[10px] text-ink-faint uppercase font-bold">Active Engine</div>
                     <div className="text-base font-bold text-ink-rich">{quota.provider_name}</div>
@@ -1254,21 +1254,21 @@ export default function SettingsPanel({ visible = true }) {
                 </div>
               )}
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-ink-rich uppercase tracking-wider">Configured AI Engines</h3>
                   <p className="text-xs text-ink-muted mt-0.5">Manage Gemini, OpenAI-compatible, or Anthropic providers for metadata &amp; lyrics enrichment.</p>
                 </div>
                 <button 
                   onClick={() => setShowAddForm(!showAddForm)}
-                  className="btn-primary !py-2 !px-4 text-xs"
+                  className="btn-primary !py-2 !px-4 text-xs self-start sm:self-auto shrink-0"
                 >
                   {showAddForm ? 'Cancel' : '+ Add Provider'}
                 </button>
               </div>
 
               {showAddForm && (
-                <div className="p-5 rounded-xl bg-surface-2 border border-amber-400/30 space-y-4 shadow-inner">
+                <div className="p-4 sm:p-5 rounded-xl bg-surface-2 border border-amber-400/30 space-y-4 shadow-inner">
                   {formError && (
                     <div className="px-3 py-2 rounded bg-fn-danger/10 border border-fn-danger/20 text-xs text-fn-danger font-bold">
                       {formError}
@@ -1321,25 +1321,25 @@ export default function SettingsPanel({ visible = true }) {
 
               <div className="space-y-3">
                 {providers.map(p => (
-                  <div key={p.id} className={`p-4 rounded-xl border transition-all ${p.is_active ? 'bg-surface-0 border-amber-400/40 shadow-md ring-1 ring-amber-400/10' : 'bg-surface-0 border-surface-4 hover:border-surface-6'}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${p.is_active ? 'bg-amber-400/15 text-amber-400' : 'bg-surface-3 text-ink-faint'}`}>
+                  <div key={p.id} className={`p-3.5 sm:p-4 rounded-xl border transition-all ${p.is_active ? 'bg-surface-0 border-amber-400/40 shadow-md ring-1 ring-amber-400/10' : 'bg-surface-0 border-surface-4 hover:border-surface-6'}`}>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`p-2 rounded-lg shrink-0 ${p.is_active ? 'bg-amber-400/15 text-amber-400' : 'bg-surface-3 text-ink-faint'}`}>
                           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></svg>
                         </div>
-                        <div>
-                          <div className="text-sm font-bold text-ink-rich">{p.name}</div>
-                          <div className="text-xs text-ink-faint font-mono">{presets[p.provider]?.label || p.provider}</div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold text-ink-rich truncate">{p.name}</div>
+                          <div className="text-xs text-ink-faint font-mono truncate">{presets[p.provider]?.label || p.provider}</div>
                         </div>
                       </div>
                       {p.is_active ? (
-                        <span className="px-2.5 py-1 rounded-full bg-amber-400/20 text-amber-400 text-[10px] font-black uppercase tracking-widest">Active</span>
+                        <span className="px-2.5 py-1 rounded-full bg-amber-400/20 text-amber-400 text-[10px] font-black uppercase tracking-widest shrink-0">Active</span>
                       ) : (
-                        <button onClick={() => handleActivate(p.id)} className="px-3 py-1 rounded-lg bg-surface-2 hover:bg-amber-400/15 text-xs font-bold text-amber-400 border border-amber-400/30 transition-colors">Activate</button>
+                        <button onClick={() => handleActivate(p.id)} className="px-3 py-1 rounded-lg bg-surface-2 hover:bg-amber-400/15 text-xs font-bold text-amber-400 border border-amber-400/30 transition-colors shrink-0">Activate</button>
                       )}
                     </div>
-                    <div className="flex items-center justify-between pt-3 border-t border-surface-4 mt-3">
-                      <div className="text-xs text-ink-muted flex-1 flex flex-wrap items-center gap-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-surface-4 mt-3">
+                      <div className="text-xs text-ink-muted flex-1 flex flex-wrap items-center gap-y-1 min-w-0">
                         <span className="mr-1">Key:</span>
                         {editingKeyId === p.id ? (
                           <div className="flex items-center gap-1.5 mr-4">
@@ -1347,7 +1347,7 @@ export default function SettingsPanel({ visible = true }) {
                               type="password"
                               placeholder="New API Key..."
                               autoFocus
-                              className="bg-surface-2 border border-amber-400/50 rounded px-2.5 py-1 text-xs font-mono outline-none w-40"
+                              className="bg-surface-2 border border-amber-400/50 rounded px-2.5 py-1 text-xs font-mono outline-none w-32 sm:w-40"
                               onKeyDown={e => {
                                 if (e.key === 'Enter') handleUpdateKey(p.id, e.target.value);
                                 if (e.key === 'Escape') setEditingKeyId(null);
@@ -1412,20 +1412,20 @@ export default function SettingsPanel({ visible = true }) {
                         ) : (
                           <span 
                             onClick={() => setEditingId(p.id)}
-                            className="font-mono text-ink-rich hover:text-amber-400 cursor-pointer underline decoration-dotted underline-offset-2 ml-1"
+                            className="font-mono text-ink-rich hover:text-amber-400 cursor-pointer underline decoration-dotted underline-offset-2 ml-1 break-all"
                           >
                             {p.model || 'Default'}
                           </span>
                         )}
                       </div>
                       {deleteConfirmId === p.id ? (
-                        <div className="flex gap-2 items-center">
+                        <div className="flex gap-2 items-center shrink-0">
                           <span className="text-xs text-fn-danger font-bold">Delete?</span>
                           <button onClick={() => { handleDelete(p.id); setDeleteConfirmId(null); }} className="text-xs font-bold text-white bg-fn-danger px-2 py-0.5 rounded">Yes</button>
                           <button onClick={() => setDeleteConfirmId(null)} className="text-xs font-bold text-ink-muted px-2 py-0.5">No</button>
                         </div>
                       ) : (
-                        <button onClick={() => setDeleteConfirmId(p.id)} className="text-xs text-fn-danger/70 hover:text-fn-danger font-bold">
+                        <button onClick={() => setDeleteConfirmId(p.id)} className="text-xs text-fn-danger/70 hover:text-fn-danger font-bold shrink-0">
                           Delete
                         </button>
                       )}
@@ -1463,7 +1463,7 @@ export default function SettingsPanel({ visible = true }) {
                       <option value="soundtrack">Soundtrack Marker</option>
                     </select>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="flex items-center gap-2 cursor-pointer group">
                       <input 
                         type="checkbox" 
@@ -1486,7 +1486,7 @@ export default function SettingsPanel({ visible = true }) {
 
               {cleanupSuggestions.length > 0 && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-1">
                     <label className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
                       Junk Discovery Candidates ({cleanupSuggestions.length})
                     </label>
@@ -1495,11 +1495,11 @@ export default function SettingsPanel({ visible = true }) {
                   
                   <div className="grid grid-cols-1 gap-3">
                     {cleanupSuggestions.map((s) => (
-                      <div key={s.id} className="p-4 rounded-xl bg-amber-400/5 border border-amber-400/20 flex items-start justify-between gap-4">
+                      <div key={s.id} className="p-3.5 sm:p-4 rounded-xl bg-amber-400/5 border border-amber-400/20 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                         <div className="space-y-1.5 flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-mono font-bold text-amber-400 truncate">{s.pattern}</span>
-                            <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-500 text-[10px] font-black uppercase">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-mono font-bold text-amber-400 break-all">{s.pattern}</span>
+                            <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-500 text-[10px] font-black uppercase shrink-0">
                               {s.frequency} Tracks
                             </span>
                           </div>
@@ -1509,7 +1509,7 @@ export default function SettingsPanel({ visible = true }) {
                             </div>
                           )}
                         </div>
-                        <div className="flex gap-2 shrink-0">
+                        <div className="flex gap-2 shrink-0 self-end sm:self-auto">
                           <button 
                             onClick={() => handleAcceptSuggestion(s.id)}
                             className="px-3 py-1.5 rounded-lg bg-amber-400 text-surface-0 text-xs font-black uppercase hover:bg-amber-500"

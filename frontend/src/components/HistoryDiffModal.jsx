@@ -15,14 +15,14 @@ export default function HistoryDiffModal({ entry, onClose }) {
     : allKeys;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6" onClick={onClose}>
-      <div className="studio-card max-w-5xl w-full max-h-[90vh] flex flex-col animate-scale-in border-surface-6 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-surface-4 flex items-center justify-between bg-surface-2">
-          <div>
-            <h3 className="text-lg font-bold text-ink-rich">Raw Tag Comparison</h3>
-            <p className="text-[10px] text-ink-faint font-mono truncate max-w-md">{entry.track_path}</p>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-6" onClick={onClose}>
+      <div className="studio-card max-w-5xl w-full max-h-[92dvh] flex flex-col animate-scale-in border-surface-6 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-3.5 sm:px-6 py-3 sm:py-4 border-b border-surface-4 flex flex-wrap items-center justify-between gap-2 bg-surface-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm sm:text-lg font-bold text-ink-rich">Raw Tag Comparison</h3>
+            <p className="text-[10px] text-ink-faint font-mono truncate max-w-full sm:max-w-md">{entry.track_path}</p>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 sm:gap-6 shrink-0">
             <label className="flex items-center gap-2 cursor-pointer group">
                <div className="relative">
                  <input 
@@ -34,26 +34,26 @@ export default function HistoryDiffModal({ entry, onClose }) {
                  <div className={`w-8 h-4 rounded-full transition-colors ${diffOnly ? 'bg-amber-400' : 'bg-surface-5'}`} />
                  <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform ${diffOnly ? 'translate-x-4' : ''}`} />
                </div>
-               <span className="text-[10px] font-bold text-ink-muted group-hover:text-ink-normal uppercase tracking-wider">Show Changes Only</span>
+               <span className="text-[10px] font-bold text-ink-muted group-hover:text-ink-normal uppercase tracking-wider">Changes Only</span>
             </label>
             <button 
               onClick={onClose} 
-              className="p-2 rounded-lg hover:bg-surface-4 text-ink-muted transition-colors"
+              className="p-1.5 sm:p-2 rounded-lg hover:bg-surface-4 text-ink-muted transition-colors"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-6 bg-surface-1">
-          <div className="grid grid-cols-2 gap-8 h-full">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 bg-surface-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 h-full">
             {/* Before */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center gap-2 mb-1 sm:mb-2">
                 <span className="w-2 h-2 rounded-full bg-fn-danger shadow-glow-danger" />
                 <h4 className="text-[11px] font-black uppercase text-fn-danger tracking-[0.2em]">Original State</h4>
               </div>
-              <div className="max-h-[500px] overflow-y-auto pr-2 space-y-1.5 font-mono text-[11px]">
+              <div className="max-h-[340px] sm:max-h-[500px] overflow-y-auto pr-1 sm:pr-2 space-y-1.5 font-mono text-[11px]">
                 {displayedKeys.length > 0 ? (
                   displayedKeys.map(k => {
                     const v = rawBefore[k];
@@ -73,7 +73,7 @@ export default function HistoryDiffModal({ entry, onClose }) {
                     );
                   })
                 ) : (
-                  <div className="py-20 text-center text-ink-faint border border-dashed border-surface-4 rounded-xl italic">
+                  <div className="py-12 sm:py-20 text-center text-ink-faint border border-dashed border-surface-4 rounded-xl italic">
                     {diffOnly ? 'No differences found' : 'No tags captured'}
                   </div>
                 )}
@@ -81,12 +81,12 @@ export default function HistoryDiffModal({ entry, onClose }) {
             </div>
 
             {/* After */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center gap-2 mb-1 sm:mb-2">
                 <span className="w-2 h-2 rounded-full bg-fn-success shadow-glow-success" />
                 <h4 className="text-[11px] font-black uppercase text-fn-success tracking-[0.2em]">Cleaned State</h4>
               </div>
-              <div className="max-h-[500px] overflow-y-auto pr-2 space-y-1.5 font-mono text-[11px]">
+              <div className="max-h-[340px] sm:max-h-[500px] overflow-y-auto pr-1 sm:pr-2 space-y-1.5 font-mono text-[11px]">
                 {displayedKeys.length > 0 ? (
                   displayedKeys.map(k => {
                     const v = rawAfter[k];
@@ -115,7 +115,7 @@ export default function HistoryDiffModal({ entry, onClose }) {
                     );
                   })
                 ) : (
-                  <div className="py-20 text-center text-ink-faint border border-dashed border-surface-4 rounded-xl italic">
+                  <div className="py-12 sm:py-20 text-center text-ink-faint border border-dashed border-surface-4 rounded-xl italic">
                     {diffOnly ? 'No differences found' : ''}
                   </div>
                 )}
@@ -124,9 +124,9 @@ export default function HistoryDiffModal({ entry, onClose }) {
           </div>
         </div>
         
-        <div className="px-6 py-4 bg-surface-2 border-t border-surface-4 flex items-center justify-between">
-          <p className="text-[10px] text-ink-faint italic font-medium">Standard frames are automatically re-mapped to modern containers.</p>
-          <button onClick={onClose} className="btn-secondary !px-8">Close Details</button>
+        <div className="px-3.5 sm:px-6 py-3 sm:py-4 bg-surface-2 border-t border-surface-4 flex items-center justify-between gap-2">
+          <p className="text-[10px] text-ink-faint italic font-medium hidden sm:block">Standard frames are automatically re-mapped to modern containers.</p>
+          <button onClick={onClose} className="btn-secondary w-full sm:w-auto justify-center !px-8">Close Details</button>
         </div>
       </div>
     </div>

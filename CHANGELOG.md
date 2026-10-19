@@ -6,9 +6,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [0.1.9] — 2026-10-17
+## [0.1.9] — 2026-10-18 (Build 20261018)
 
 ### Added
+- **Adaptive Mobile & Multi-Viewport Responsive Engine (`useViewport`)** — Added real-time browser viewport and input-device detection (`useViewport.js`) using `ResizeObserver`, `window.visualViewport`, and pointer/touch media queries (`coarse` / `hover: none`) to dynamically optimize layouts from `320px` phones to ultra-wide studio monitors.
+- **Mobile Track Cards & Responsive Action Toolbars** — Added dedicated mobile card layouts in `TrackTable.jsx` with inline play, cover art, format/language/lyrics badges, and 1-tap editing, while keeping all three Library action button groups (`AI Fix / Lyrics / Clean Names`, `Local Fix / Fix Names / Sync Lang / Edit`, `Refresh / Scan`) permanently visible in symmetrical full-width studio bars on mobile.
+- **Mobile-Optimized Album Art Studio, Modals, History & Settings** — Adapted `AlbumArtGallery.jsx`, `TrackMetadataModal.jsx`, `HistoryView.jsx`, `HistoryDiffModal.jsx`, `SettingsPanel.jsx`, and `PlayerBar.jsx` with touch-accessible controls (no hover dependency), symmetrical 12-column filter/sort/group grids, and stacked mobile diff/modal views.
 - **Real-Time Filesystem Monitor (Live Watch)** — Background `FilesystemWatcher` service (`fs_watcher.py`) that actively monitors library source folders for newly added, modified, or deleted audio files (`SUPPORTED_EXTENSIONS` only; ignores `cover.jpg`, `.lrc`, `.nfo`, and hidden temp files). Includes configurable **Add & Delete Only** mode (safe for Jellyfin/Navidrome co-existence), write-settle debounce (`1.5s`), and automatic self-write suppression (`suppress_path` / `suppress_rename`) when LexiTag modifies or renames files.
 - **Database Maintenance & Old Path Cleanup** — Added `/api/settings/database/stats` and `/api/settings/database/cleanup` endpoints plus a dedicated **Database Maintenance** section in Settings to inspect total vs. active vs. out-of-scope tracks, purge stale/orphaned path records, and run non-blocking background SQLite `VACUUM`.
 - **Dedicated `/settings` Page with Sidebar Navigation** — Moved Settings out of the main Library page into its own full-page `/settings` route with a 4-section sidebar (`Library & Scanning`, `AI & Lyrics`, `Automation & Cleanup`, `System & Logs`).

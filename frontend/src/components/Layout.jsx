@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useFixerContext, useTracksContext } from '../contexts/AppContext';
+import { useViewport } from '../hooks/useViewport';
 import FixerControls from './FixerControls';
 import PlayerBar from './PlayerBar';
 import LyricsPanel from './LyricsPanel';
@@ -9,6 +10,7 @@ import SelectionHelper from './SelectionHelper';
 export default function Layout({ children }) {
   const fixer = useFixerContext();
   const tracks = useTracksContext();
+  const viewport = useViewport();
   const [version, setVersion] = useState('');
   const [showLyrics, setShowLyrics] = useState(false);
   const [scanMinimized, setScanMinimized] = useState(false);
@@ -29,26 +31,26 @@ export default function Layout({ children }) {
   }, []);
 
   return (
-    <div className="h-screen w-screen max-w-full flex flex-col bg-surface-0 overflow-hidden">
+    <div className="app-viewport flex flex-col bg-surface-0 overflow-hidden safe-pt">
       {/* Header */}
       <header className="shrink-0 border-b border-surface-5/40 bg-surface-1/90 backdrop-blur-md z-30 w-full max-w-full">
-        <div className="max-w-[1920px] mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">
+        <div className="max-w-[1920px] mx-auto px-2 sm:px-6 h-12 sm:h-14 flex items-center justify-between gap-1 sm:gap-2">
           {/* Logo */}
-          <NavLink to="/" className="flex items-center gap-2 sm:gap-2.5 group transition-transform active:scale-95 shrink-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-400 flex items-center justify-center shadow-inner-glow group-hover:shadow-amber-400/20 transition-all">
-              <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-surface-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <NavLink to="/" className="flex items-center gap-1.5 sm:gap-2.5 group transition-transform active:scale-95 shrink-0">
+            <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-amber-400 flex items-center justify-center shadow-inner-glow group-hover:shadow-amber-400/20 transition-all">
+              <svg className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 text-surface-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 18V5l12-2v13" />
                 <circle cx="6" cy="18" r="3" />
                 <circle cx="18" cy="16" r="3" />
               </svg>
             </div>
-            <h1 className="text-sm sm:text-base font-bold tracking-tight font-display flex items-baseline gap-1.5 sm:gap-2">
+            <h1 className="text-xs sm:text-base font-bold tracking-tight font-display flex items-baseline gap-1 sm:gap-2">
               <div>
                 <span className="text-ink-rich">Lexi</span>
                 <span className="text-amber-400">Tag</span>
               </div>
               {version && (
-                <span className="text-[9px] sm:text-[10px] font-medium bg-surface-3 text-ink-muted px-1.5 py-0.5 rounded border border-surface-5 font-mono">
+                <span className="hidden min-[400px]:inline-block text-[8px] sm:text-[10px] font-medium bg-surface-3 text-ink-muted px-1 sm:px-1.5 py-0.5 rounded border border-surface-5 font-mono">
                   {version}
                 </span>
               )}
@@ -56,20 +58,20 @@ export default function Layout({ children }) {
           </NavLink>
 
           {/* Nav */}
-          <nav className="flex items-center gap-1 sm:gap-1.5">
+          <nav className="flex items-center gap-0.5 sm:gap-1.5 overflow-x-auto no-scrollbar">
             <NavLink
               to="/"
               end
               className={({ isActive }) =>
-                `px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 ${
+                `px-1.5 sm:px-3.5 py-1.5 rounded-lg text-[10px] sm:text-sm font-semibold transition-all duration-150 shrink-0 ${
                   isActive
                     ? 'bg-surface-3 text-amber-400 shadow-sm'
                     : 'text-ink-muted hover:text-ink-rich hover:bg-surface-3/50'
                 }`
               }
             >
-              <span className="flex items-center gap-1.5 sm:gap-2">
-                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <span className="flex items-center gap-1 sm:gap-2">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 18V5l12-2v13" />
                   <circle cx="6" cy="18" r="3" />
                   <circle cx="18" cy="16" r="3" />
@@ -80,34 +82,34 @@ export default function Layout({ children }) {
             <NavLink
               to="/album-art"
               className={({ isActive }) =>
-                `px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 ${
+                `px-1.5 sm:px-3.5 py-1.5 rounded-lg text-[10px] sm:text-sm font-semibold transition-all duration-150 shrink-0 ${
                   isActive
                     ? 'bg-surface-3 text-amber-400 shadow-sm'
                     : 'text-ink-muted hover:text-ink-rich hover:bg-surface-3/50'
                 }`
               }
             >
-              <span className="flex items-center gap-1.5 sm:gap-2">
-                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <span className="flex items-center gap-1 sm:gap-2">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                   <circle cx="8.5" cy="8.5" r="1.5"/>
                   <polyline points="21 15 16 10 5 21"/>
                 </svg>
-                <span>Album Art</span>
+                <span>{viewport.isXS ? 'Art' : 'Album Art'}</span>
               </span>
             </NavLink>
             <NavLink
               to="/history"
               className={({ isActive }) =>
-                `px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 ${
+                `px-1.5 sm:px-3.5 py-1.5 rounded-lg text-[10px] sm:text-sm font-semibold transition-all duration-150 shrink-0 ${
                   isActive
                     ? 'bg-surface-3 text-amber-400 shadow-sm'
                     : 'text-ink-muted hover:text-ink-rich hover:bg-surface-3/50'
                 }`
               }
             >
-              <span className="flex items-center gap-1.5 sm:gap-2">
-                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <span className="flex items-center gap-1 sm:gap-2">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
@@ -117,7 +119,7 @@ export default function Layout({ children }) {
             <NavLink
               to="/settings"
               className={({ isActive }) =>
-                `px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 ${
+                `px-1.5 sm:px-3.5 py-1.5 rounded-lg text-[10px] sm:text-sm font-semibold transition-all duration-150 shrink-0 ${
                   isActive
                     ? 'bg-surface-3 text-amber-400 shadow-sm'
                     : 'text-ink-muted hover:text-ink-rich hover:bg-surface-3/50'
@@ -125,8 +127,8 @@ export default function Layout({ children }) {
               }
               id="settings-nav-btn"
             >
-              <span className="flex items-center gap-1.5 sm:gap-2">
-                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <span className="flex items-center gap-1 sm:gap-2">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="3" />
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
@@ -139,7 +141,7 @@ export default function Layout({ children }) {
 
       {/* Global Scan / Status Refresh Progress Overlay */}
       {tracks?.scanProgress && (
-        <div className={`fixed top-20 right-6 z-[60] animate-slide-in-right ${scanMinimized ? 'w-auto' : 'w-80'}`}>
+        <div className={`fixed top-14 sm:top-20 right-3 sm:right-6 z-[60] animate-slide-in-right ${scanMinimized ? 'w-auto' : 'left-3 sm:left-auto sm:w-80'}`}>
           {scanMinimized ? (
             <div 
               onClick={() => setScanMinimized(false)}
@@ -206,10 +208,10 @@ export default function Layout({ children }) {
       )}
 
       {/* Content Wrapper */}
-      <div className="flex-1 flex overflow-hidden relative w-full max-w-full min-w-0 pb-20">
+      <div className="flex-1 flex overflow-hidden relative w-full max-w-full min-w-0 pb-16 sm:pb-20">
         {/* Main Area */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden transition-all duration-300 relative w-full max-w-full min-w-0">
-          <div className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 pb-12 min-w-0">
+          <div className="max-w-[1600px] w-full mx-auto px-2.5 sm:px-6 py-2.5 sm:py-5 pb-12 min-w-0">
             {children}
           </div>
         </main>
@@ -222,7 +224,7 @@ export default function Layout({ children }) {
           />
         )}
         <aside 
-          className={`fixed md:relative right-0 top-14 md:top-0 bottom-0 z-50 md:z-auto h-[calc(100%-3.5rem)] md:h-full border-l border-surface-5/40 bg-surface-1/95 md:bg-surface-1/50 backdrop-blur-md md:backdrop-blur-sm transition-all duration-300 ease-in-out ${
+          className={`fixed md:relative right-0 top-12 sm:top-14 md:top-0 bottom-0 z-50 md:z-auto h-[calc(100dvh-3rem)] sm:h-[calc(100dvh-3.5rem)] md:h-full border-l border-surface-5/40 bg-surface-1/95 md:bg-surface-1/50 backdrop-blur-md md:backdrop-blur-sm transition-all duration-300 ease-in-out ${
             showLyrics ? 'w-full sm:w-[400px] opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-full md:translate-x-0 pointer-events-none md:pointer-events-auto'
           } overflow-hidden shadow-2xl md:shadow-none`}
         >
@@ -234,7 +236,7 @@ export default function Layout({ children }) {
 
       {/* Global Fixer Progress */}
       {fixer.isVisible && (
-        <div className="fixed bottom-24 right-3 sm:right-6 z-[150] w-[460px] max-w-[calc(100vw-1.5rem)]">
+        <div className="fixed bottom-20 sm:bottom-24 right-2 sm:right-6 left-2 sm:left-auto z-[150] sm:w-[460px] max-w-[calc(100dvw-1rem)]">
           <FixerControls 
             progress={fixer.progress} 
             totalTracks={fixer.totalTracks}

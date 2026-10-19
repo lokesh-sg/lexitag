@@ -153,14 +153,14 @@ export default function Dashboard() {
   return (
     <div className="space-y-3 animate-fade-in relative">
       {/* Header Bar with Always-Visible File Fixing & Library Action Buttons */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 shrink-0">
-          <h2 className="text-lg sm:text-2xl font-bold text-ink-rich font-display tracking-tight">Music Library</h2>
-          <span className="text-[10px] sm:text-xs text-ink-muted bg-surface-2 px-2.5 py-1 rounded-full border border-surface-4 font-mono font-semibold">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <h2 className="text-base sm:text-2xl font-bold text-ink-rich font-display tracking-tight">Music Library</h2>
+          <span className="text-[10px] sm:text-xs text-ink-muted bg-surface-2 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-surface-4 font-mono font-semibold">
             {tracks.total.toLocaleString()} track{tracks.total !== 1 ? 's' : ''}
           </span>
           {selected.size > 0 && (
-            <span className="text-[10px] sm:text-xs text-amber-400 bg-amber-400/15 px-2.5 py-1 rounded-full border border-amber-400/35 font-bold flex items-center gap-1.5">
+            <span className="text-[10px] sm:text-xs text-amber-400 bg-amber-400/15 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-amber-400/35 font-bold flex items-center gap-1.5">
               <span>{selected.size.toLocaleString()} selected</span>
               <button
                 onClick={() => setSelected(new Set())}
@@ -173,19 +173,19 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Always-Visible Organized Action Toolbar */}
-        <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 max-w-full">
-          {/* Group 1: AI & Lyrics Tools */}
-          <div className="flex items-center gap-1 bg-surface-1 p-1 rounded-xl border border-surface-4">
+        {/* Always-Visible Organized Action Toolbar — Symmetrical full-width rows on mobile, inline on desktop */}
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-1.5 py-0.5 w-full sm:w-auto max-w-full">
+          {/* Group 1: AI & Lyrics Tools + Refresh/Scan on mobile top row */}
+          <div className="flex items-center gap-1 bg-surface-1 p-1 rounded-xl border border-surface-4 w-full sm:w-auto justify-between sm:justify-start">
             <button
               onClick={handleFix}
               disabled={fixer.isFixing || selected.size === 0}
-              className="btn-secondary !px-2.5 !py-1.5 !text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
+              className="btn-secondary flex-1 sm:flex-initial justify-center !px-2 sm:!px-2.5 !py-1.5 !text-[11px] sm:!text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
               id="ai-fix-selected-btn"
               title="Run full AI metadata & lyrics fix on selected tracks"
             >
-              <div className="flex items-center gap-1.5 font-bold">
-                <svg className="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <div className="flex items-center justify-center gap-1 sm:gap-1.5 font-bold whitespace-nowrap">
+                <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                 </svg>
                 <span>AI Fix {selected.size > 0 ? `(${selected.size})` : ''}</span>
@@ -195,11 +195,11 @@ export default function Dashboard() {
             <button
               onClick={handlePullLyrics}
               disabled={fixer.isFixing || selected.size === 0}
-              className="btn-secondary !px-2.5 !py-1.5 !text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
+              className="btn-secondary flex-1 sm:flex-initial justify-center !px-2 sm:!px-2.5 !py-1.5 !text-[11px] sm:!text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
               title="Pull Lyrics Only (LLM)"
             >
-              <div className="flex items-center gap-1.5 font-bold">
-                <svg className="w-3.5 h-3.5 text-fn-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <div className="flex items-center justify-center gap-1 sm:gap-1.5 font-bold whitespace-nowrap">
+                <svg className="w-3.5 h-3.5 text-fn-purple shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 18V5l12-2v13" />
                   <circle cx="6" cy="18" r="3" />
                   <circle cx="18" cy="16" r="3" />
@@ -210,10 +210,10 @@ export default function Dashboard() {
 
             {/* Filename Cleaning Toggle */}
             <label
-              className="flex items-center gap-1.5 cursor-pointer group bg-surface-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-3 transition-colors border border-surface-4 shrink-0"
+              className="flex items-center justify-center gap-1.5 cursor-pointer group bg-surface-2 px-2 sm:px-2.5 py-1.5 rounded-lg hover:bg-surface-3 transition-colors border border-surface-4 shrink-0"
               title="Also rename files on disk during AI Fix"
             >
-              <div className="relative">
+              <div className="relative shrink-0">
                 <input 
                   type="checkbox" 
                   className="sr-only" 
@@ -230,15 +230,15 @@ export default function Dashboard() {
           </div>
 
           {/* Group 2: Local & Manual Tag Tools */}
-          <div className="flex items-center gap-1 bg-surface-1 p-1 rounded-xl border border-surface-4">
+          <div className="grid grid-cols-4 sm:flex items-center gap-1 bg-surface-1 p-1 rounded-xl border border-surface-4 w-full sm:w-auto">
             <button
               onClick={handleLocalFix}
               disabled={selected.size === 0}
-              className="btn-secondary !px-2.5 !py-1.5 !text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
+              className="btn-secondary justify-center !px-1.5 sm:!px-2.5 !py-1.5 !text-[10px] sm:!text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
               title="Local Standardization (No LLM)"
             >
-              <div className="flex items-center gap-1.5 font-bold">
-                <svg className="w-3.5 h-3.5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <div className="flex items-center justify-center gap-1 sm:gap-1.5 font-bold whitespace-nowrap">
+                <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                   <polyline points="7.5 4.21 12 6.81 16.5 4.21" />
                   <polyline points="7.5 19.79 7.5 14.6 3 12" />
@@ -253,11 +253,11 @@ export default function Dashboard() {
             <button
               onClick={handleFixFilenames}
               disabled={selected.size === 0}
-              className="btn-secondary !px-2.5 !py-1.5 !text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
+              className="btn-secondary justify-center !px-1.5 sm:!px-2.5 !py-1.5 !text-[10px] sm:!text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
               title="Fix Filenames based on current tags"
             >
-              <div className="flex items-center gap-1.5 font-bold">
-                <svg className="w-3.5 h-3.5 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <div className="flex items-center justify-center gap-1 sm:gap-1.5 font-bold whitespace-nowrap">
+                <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-orange-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 20h9" />
                   <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                 </svg>
@@ -268,11 +268,11 @@ export default function Dashboard() {
             <button
               onClick={handleSyncLanguage}
               disabled={selected.size === 0}
-              className="btn-secondary !px-2.5 !py-1.5 !text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
+              className="btn-secondary justify-center !px-1.5 sm:!px-2.5 !py-1.5 !text-[10px] sm:!text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
               title="Append Language to Genre for Selected"
             >
-              <div className="flex items-center gap-1.5 font-bold">
-                <svg className="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <div className="flex items-center justify-center gap-1 sm:gap-1.5 font-bold whitespace-nowrap">
+                <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 7v4a1 1 0 001 1h3" />
                   <path d="M21 17v-4a1 1 0 00-1-1h-3" />
                   <path d="M21 3v6h-6" />
@@ -287,11 +287,11 @@ export default function Dashboard() {
             <button
               onClick={handleBulkEdit}
               disabled={selected.size === 0}
-              className="btn-secondary !px-2.5 !py-1.5 !text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
+              className="btn-secondary justify-center !px-1.5 sm:!px-2.5 !py-1.5 !text-[10px] sm:!text-xs shrink-0 disabled:opacity-45 disabled:cursor-not-allowed"
               title="Edit shared tags"
             >
-              <div className="flex items-center gap-1.5 font-bold">
-                <svg className="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div className="flex items-center justify-center gap-1 sm:gap-1.5 font-bold whitespace-nowrap">
+                <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                 </svg>
@@ -301,11 +301,11 @@ export default function Dashboard() {
           </div>
 
           {/* Group 3: Library Refresh & Scan */}
-          <div className="flex items-center gap-1 bg-surface-1 p-1 rounded-xl border border-surface-4">
+          <div className="grid grid-cols-2 sm:flex items-center gap-1 bg-surface-1 p-1 rounded-xl border border-surface-4 w-full sm:w-auto">
             <button
               onClick={tracks.refresh}
               disabled={tracks.scanning}
-              className="px-2.5 py-1.5 rounded-lg bg-surface-2 border border-surface-4 text-ink-normal hover:text-amber-400 hover:bg-surface-3 transition-all disabled:opacity-50 text-xs font-semibold flex items-center gap-1.5 shrink-0"
+              className="px-2 sm:px-2.5 py-1.5 rounded-lg bg-surface-2 border border-surface-4 text-ink-normal hover:text-amber-400 hover:bg-surface-3 transition-all disabled:opacity-50 text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shrink-0"
               title="Fast junk re-evaluation"
             >
               {tracks.scanning && tracks.scanProgress?.type === 'refresh' ? (
@@ -318,13 +318,13 @@ export default function Dashboard() {
                   <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                 </svg>
               )}
-              <span className="hidden sm:inline">Refresh</span>
+              <span>Refresh</span>
             </button>
 
             <button
               onClick={tracks.scan}
               disabled={tracks.scanning}
-              className="px-3 py-1.5 rounded-lg bg-amber-400/15 border border-amber-400/35 text-amber-400 hover:bg-amber-400/25 transition-all disabled:opacity-50 text-xs font-bold flex items-center gap-1.5 shrink-0"
+              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-400/15 border border-amber-400/35 text-amber-400 hover:bg-amber-400/25 transition-all disabled:opacity-50 text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 shrink-0"
               id="scan-library-btn"
               title="Full Library Scan"
             >
@@ -382,18 +382,32 @@ export default function Dashboard() {
 
       {/* Bottom Pagination — Sticky above PlayerBar */}
       {tracks.total > tracks.pageSize && (
-        <div className="sticky bottom-2 z-20 studio-card px-4 py-2.5 bg-surface-1/95 backdrop-blur-md border border-surface-4 shadow-xl flex items-center justify-between">
-          <p className="text-xs font-mono text-ink-normal">
-            Showing <strong className="text-ink-rich">{((tracks.page - 1) * tracks.pageSize + 1).toLocaleString()}–{Math.min(tracks.page * tracks.pageSize, tracks.total).toLocaleString()}</strong> of <strong className="text-amber-400">{tracks.total.toLocaleString()}</strong> tracks
+        <div className="sticky bottom-2 z-20 studio-card px-2.5 sm:px-4 py-2 sm:py-2.5 bg-surface-1/95 backdrop-blur-md border border-surface-4 shadow-xl flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] sm:text-xs font-mono text-ink-normal">
+            <span className="hidden sm:inline">Showing </span>
+            <strong className="text-ink-rich">{((tracks.page - 1) * tracks.pageSize + 1).toLocaleString()}–{Math.min(tracks.page * tracks.pageSize, tracks.total).toLocaleString()}</strong> of <strong className="text-amber-400">{tracks.total.toLocaleString()}</strong>
+            <span className="hidden sm:inline"> tracks</span>
           </p>
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => tracks.setPage(1)} disabled={tracks.page <= 1} className="p-1 px-2.5 rounded-lg bg-surface-2 border border-surface-4 hover:border-amber-500/40 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-normal uppercase tracking-tighter">First</button>
-            <button onClick={() => tracks.setPage(p => Math.max(1, p - 1))} disabled={tracks.page <= 1} className="p-1 px-3 rounded-lg bg-surface-2 border border-surface-4 hover:border-amber-500/40 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-rich">← Prev</button>
-            <div className="px-3.5 py-1 rounded-lg bg-surface-0 border border-amber-400/30 text-xs font-mono font-black text-amber-400 tabular-nums">
-              Page {tracks.page} / {Math.ceil(tracks.total / tracks.pageSize)}
+          <div className="flex items-center gap-1 sm:gap-1.5 ml-auto">
+            <button onClick={() => tracks.setPage(1)} disabled={tracks.page <= 1} className="p-1 px-2 sm:px-2.5 rounded-lg bg-surface-2 border border-surface-4 hover:border-amber-500/40 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-normal uppercase tracking-tighter">
+              <span className="hidden sm:inline">First</span>
+              <span className="sm:hidden">«</span>
+            </button>
+            <button onClick={() => tracks.setPage(p => Math.max(1, p - 1))} disabled={tracks.page <= 1} className="p-1 px-2 sm:px-3 rounded-lg bg-surface-2 border border-surface-4 hover:border-amber-500/40 hover:bg-surface-3 transition-all disabled:opacity-30 text-[11px] sm:text-xs font-bold text-ink-rich">
+              <span className="hidden sm:inline">← Prev</span>
+              <span className="sm:hidden">‹</span>
+            </button>
+            <div className="px-2 sm:px-3.5 py-1 rounded-lg bg-surface-0 border border-amber-400/30 text-[11px] sm:text-xs font-mono font-black text-amber-400 tabular-nums">
+              <span className="hidden sm:inline">Page </span>{tracks.page} / {Math.ceil(tracks.total / tracks.pageSize)}
             </div>
-            <button onClick={() => tracks.setPage(p => p + 1)} disabled={tracks.page * tracks.pageSize >= tracks.total} className="p-1 px-3 rounded-lg bg-surface-2 border border-surface-4 hover:border-amber-500/40 hover:bg-surface-3 transition-all disabled:opacity-30 text-xs font-bold text-ink-rich">Next →</button>
-            <button onClick={() => tracks.setPage(Math.ceil(tracks.total / tracks.pageSize))} disabled={tracks.page * tracks.pageSize >= tracks.total} className="p-1 px-2.5 rounded-lg bg-surface-2 border border-surface-4 hover:border-amber-500/40 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-normal uppercase tracking-tighter">Last</button>
+            <button onClick={() => tracks.setPage(p => p + 1)} disabled={tracks.page * tracks.pageSize >= tracks.total} className="p-1 px-2 sm:px-3 rounded-lg bg-surface-2 border border-surface-4 hover:border-amber-500/40 hover:bg-surface-3 transition-all disabled:opacity-30 text-[11px] sm:text-xs font-bold text-ink-rich">
+              <span className="hidden sm:inline">Next →</span>
+              <span className="sm:hidden">›</span>
+            </button>
+            <button onClick={() => tracks.setPage(Math.ceil(tracks.total / tracks.pageSize))} disabled={tracks.page * tracks.pageSize >= tracks.total} className="p-1 px-2 sm:px-2.5 rounded-lg bg-surface-2 border border-surface-4 hover:border-amber-500/40 hover:bg-surface-3 transition-all disabled:opacity-30 text-[10px] font-black text-ink-normal uppercase tracking-tighter">
+              <span className="hidden sm:inline">Last</span>
+              <span className="sm:hidden">»</span>
+            </button>
           </div>
         </div>
       )}
