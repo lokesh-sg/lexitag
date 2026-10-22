@@ -189,6 +189,6 @@ Settings can be configured via `.env` or directly in the web UI under **Settings
 
 See [CHANGELOG.md](CHANGELOG.md) for full release notes.
 
-**Latest Release: [v0.1.9 (Build 20261018)](CHANGELOG.md#019--2026-10-18-build-20261018)** — Adaptive Mobile & Multi-Viewport Responsive UI, Real-Time Filesystem Monitor (Live Watch), Database & Old Path Cleanup, Dedicated Settings Page, Recently Added Filter & Sorting, and Dependency Security Updates.
+**Latest Release: [v0.1.9 (Build 20261022)](CHANGELOG.md#019--2026-10-22-build-20261022)** — Adaptive Mobile & Multi-Viewport Responsive UI, Real-Time Filesystem Monitor (Live Watch), Database & Old Path Cleanup, Dedicated Settings Page, Recently Added Filter & Sorting, and Dependency Security Updates.
 
 

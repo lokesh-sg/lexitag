@@ -6,7 +6,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [0.1.9] — 2026-10-18 (Build 20261018)
+## [0.1.9] — 2026-10-22 (Build 20261022)
+
+### Security & Dependency Maintenance
+- **PHP Vulnerability Audit** — Verified zero PHP usage or runtime presence in the codebase and container images (LexiTag is built exclusively on Python 3.12 and React 18).
+- **Backend Dependency Audit (`pip-audit`)** — Audited all Python backend dependencies in `requirements.txt` against PyPI security advisory database; verified 0 known vulnerabilities.
+- **Frontend Security Upgrades (`npm audit`)** — Upgraded `follow-redirects` to `1.16.1` (resolving GHSA-q3jh-wrc6-jgq8 and GHSA-8r9p-f939-6h3c) and `vite` to `6.4.5` (resolving GHSA-698v-4r3x-3vcv, GHSA-r825-w8mm-5pxw, GHSA-587h-7wmj-h5pm, GHSA-9jrq-w75r-8gcw, GHSA-rq7h-c2jc-7f22). Verified 0 production runtime vulnerabilities (`npm audit --omit=dev`).
 
 ### Added
 - **Adaptive Mobile & Multi-Viewport Responsive Engine (`useViewport`)** — Added real-time browser viewport and input-device detection (`useViewport.js`) using `ResizeObserver`, `window.visualViewport`, and pointer/touch media queries (`coarse` / `hover: none`) to dynamically optimize layouts from `320px` phones to ultra-wide studio monitors.
